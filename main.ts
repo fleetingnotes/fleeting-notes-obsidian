@@ -164,7 +164,6 @@ const writeNotes = async (notes: Array<Note>, folder: string, vault: Vault) => {
 	}
 	for (var i = 0; i < notes.length; i++) {
 		var note = notes[i];
-		if (note.content.contains('#personal')) continue;
 		var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
 		var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
 		var frontmatter = 
