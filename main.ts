@@ -1,13 +1,19 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting, request, Vault } from 'obsidian';
 
 // Remember to rename these classes and interfaces!
 
 interface MyPluginSettings {
-	mySetting: string;
+	fleeting_notes_folder: string;
+	sync_on_startup: boolean;
+	username: string;
+	password: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+	fleeting_notes_folder: '',
+	sync_on_startup: false,
+	username: '',
+	password: '',
 }
 
 export default class MyPlugin extends Plugin {
@@ -15,67 +21,22 @@ export default class MyPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
+		// This forces fleeting notes to sync with obsidian
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
+			id: 'sync-fleeting-notes',
+			name: 'Pull All Notes from Fleeting Notes',
+			callback: async () => {
+				this.syncFleetingNotes();
 			}
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// syncs on startup
+		if (this.settings.sync_on_startup) {
+			this.syncFleetingNotes();
+		}
 	}
 
 	onunload() {
@@ -89,21 +50,17 @@ export default class MyPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-}
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+	async syncFleetingNotes () {
+		try {
+			let notes = await getAllNotesRealm(this.settings.username, this.settings.password);
+			notes = notes.filter((note: Note) => !note._isDeleted);
+			await writeNotes(notes, this.settings.fleeting_notes_folder, this.app.vault);
+			new Notice('Fleeting Notes sync success!');
+		} catch (e) {
+			console.error(e);
+			new Notice('Fleeing Notes sync failed - please check settings');
+		}
 	}
 }
 
@@ -120,18 +77,108 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+		containerEl.createEl('h2', {text: 'Fleeting Notes Sync Settings'});
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('Fleeting Notes folder location')
+			.setDesc('Files will be populated here from Fleeting Notes')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('Enter the folder location')
+				.setValue(this.plugin.settings.fleeting_notes_folder)
 				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.fleeting_notes_folder = value;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('Username / Email')
+			.addText(text => text
+				.setPlaceholder('Enter username/email')
+				.setValue(this.plugin.settings.username)
+				.onChange(async (value) => {
+					this.plugin.settings.username = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Password')
+			.addText(text => text
+				.setPlaceholder('Enter password')
+				.setValue(this.plugin.settings.password)
+				.onChange(async (value) => {
+					this.plugin.settings.password = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Sync notes on startup')
+			.addToggle(tog => tog
+				.setValue(this.plugin.settings.sync_on_startup)
+				.onChange(async (val) => {
+					this.plugin.settings.sync_on_startup = val;
+					await this.plugin.saveSettings();
+				}));
+	}
+}
+
+// helper functions
+// https://stackoverflow.com/a/29855282/13659833
+function pathJoin(parts: Array<string>, sep: string = '/'){
+  var separator = sep || '/';
+  var replace   = new RegExp(separator+'{1,}', 'g');
+  return parts.join(separator).replace(replace, separator);
+}
+
+// takes in API key & query
+const getAllNotesRealm = async (email: string, password: string) => {
+  const query = `{"query":"query {  notes {    _id    title    content    source    timestamp   _isDeleted}}"}'`
+  let notes = [];
+  const config = {
+    method: 'post',
+    url: 'https://realm.mongodb.com/api/client/v2.0/app/fleeting-notes-knojs/graphql',
+    headers: { 
+      'email': email,
+      'password': password,
+    },
+    body: query,
+  };
+  const res = await request(config);
+  notes = JSON.parse(res)["data"]["notes"]
+  return notes;
+}
+
+interface Note {
+	_id: string,
+	title: string,
+	content: string,
+	timestamp: string,
+	source: string,
+	_isDeleted: boolean,
+}
+
+// TODO: add templating in the future
+const writeNotes = async (notes: Array<Note>, folder: string, vault: Vault) => {
+	var folderObj = vault.getAbstractFileByPath(folder);
+	if (folderObj == null) {
+		await vault.createFolder(folder);
+	}
+	for (var i = 0; i < notes.length; i++) {
+		var note = notes[i];
+		if (note.content.contains('#personal')) continue;
+		var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
+		var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
+		var frontmatter = 
+`---
+id: ${note._id}
+title: ${title.replace('.md', '')}
+date: ${note.timestamp.substring(0, 10)}
+---\n`
+		var path = pathJoin([folder, title]);
+		var mdContent = frontmatter + note.content + "\n\n---\n\n" + note.source;
+		var file = vault.getAbstractFileByPath(path);
+		if (file != null) {
+			await vault.delete(file);
+		}
+		await vault.create(path, mdContent);
 	}
 }
