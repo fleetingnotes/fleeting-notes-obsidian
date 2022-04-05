@@ -2,22 +2,22 @@ import { App, Notice, Plugin, PluginSettingTab, Setting, request, Vault } from '
 
 // Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
+interface FleetingNotesSettings {
 	fleeting_notes_folder: string;
 	sync_on_startup: boolean;
 	username: string;
 	password: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	fleeting_notes_folder: '',
 	sync_on_startup: false,
 	username: '',
 	password: '',
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class FleetingNotesPlugin extends Plugin {
+	settings: FleetingNotesSettings;
 
 	async onload() {
 		await this.loadSettings();
@@ -31,7 +31,7 @@ export default class MyPlugin extends Plugin {
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new FleetingNotesSettingTab(this.app, this));
 
 		// syncs on startup
 		if (this.settings.sync_on_startup) {
@@ -64,10 +64,10 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class FleetingNotesSettingTab extends PluginSettingTab {
+	plugin: FleetingNotesPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: FleetingNotesPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
