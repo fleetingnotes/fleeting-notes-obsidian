@@ -1,6 +1,6 @@
 {
 	"name": "fleeting-notes-obsidian",
-	"version": "0.0.2",
+	"version": "0.0.4",
 	"description": "This is a plugin to sync Fleeting Notes with Obsidian",
 	"main": "main.js",
 	"scripts": {
