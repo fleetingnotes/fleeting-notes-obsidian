@@ -1,4 +1,5 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, request, Vault } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting, request, Vault, MetadataCache, TFile } from 'obsidian';
+import { stringify } from 'querystring';
 
 // Remember to rename these classes and interfaces!
 
@@ -52,16 +53,71 @@ export default class FleetingNotesPlugin extends Plugin {
 	}
 
 	async syncFleetingNotes () {
+		var existingNotes = await this.getExistingFleetingNotes(this.settings.fleeting_notes_folder);
 		try {
 			let notes = await getAllNotesRealm(this.settings.username, this.settings.password);
 			notes = notes.filter((note: Note) => !note._isDeleted);
-			await writeNotes(notes, this.settings.fleeting_notes_folder, this.app.vault);
+			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
 			new Notice('Fleeting Notes sync success!');
 		} catch (e) {
 			console.error(e);
 			new Notice('Fleeing Notes sync failed - please check settings');
 		}
 	}
+	async getExistingFleetingNotes (dir: string) {
+		var files = this.app.vault.getFiles();
+		let noteMap: Map<string, TFile> = new Map<string, TFile>();
+		for (var i = 0; i < files.length; i++) {
+			var file = files[i];
+			var file_id: string;
+			var metadata = await this.app.metadataCache.getFileCache(file);
+			if (metadata.frontmatter){
+				file_id = metadata.frontmatter.id || null;
+			} else {
+				file_id = null
+			}
+			if (!file.path.startsWith(dir) || file_id == null) {
+				continue
+			}
+			noteMap.set(file_id, file);
+		}
+		return noteMap;
+	}
+	// TODO: add templating in the future
+	async writeNotes (notes: Array<Note>, folder: string) {
+		var folderObj = this.app.vault.getAbstractFileByPath(folder);
+		if (folderObj == null) {
+			await this.app.vault.createFolder(folder);
+		}
+		var existingNotes = await this.getExistingFleetingNotes(folder);
+		for (var i = 0; i < notes.length; i++) {
+			var note = notes[i];
+			var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
+			var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
+			var frontmatter = 
+`---
+id: ${note._id}
+title: ${title.replace('.md', '')}
+date: ${note.timestamp.substring(0, 10)}
+---\n`
+			var path = pathJoin([folder, title]);
+			var mdContent = frontmatter + note.content + "\n\n---\n\n" + note.source;
+			var file = existingNotes.get(note._id) || null;
+			if (file != null) {
+				// modify file if id exists in frontmatter
+				await this.app.vault.modify(file, mdContent);
+			} else {
+				// recreate file otherwise
+				var delFile = this.app.vault.getAbstractFileByPath(path);
+				if (delFile != null) {
+					await this.app.vault.delete(delFile);
+				}
+				await this.app.vault.create(path, mdContent);
+			}
+			
+		}
+	}
+
 }
 
 class FleetingNotesSettingTab extends PluginSettingTab {
@@ -156,28 +212,3 @@ interface Note {
 	_isDeleted: boolean,
 }
 
-// TODO: add templating in the future
-const writeNotes = async (notes: Array<Note>, folder: string, vault: Vault) => {
-	var folderObj = vault.getAbstractFileByPath(folder);
-	if (folderObj == null) {
-		await vault.createFolder(folder);
-	}
-	for (var i = 0; i < notes.length; i++) {
-		var note = notes[i];
-		var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
-		var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
-		var frontmatter = 
-`---
-id: ${note._id}
-title: ${title.replace('.md', '')}
-date: ${note.timestamp.substring(0, 10)}
----\n`
-		var path = pathJoin([folder, title]);
-		var mdContent = frontmatter + note.content + "\n\n---\n\n" + note.source;
-		var file = vault.getAbstractFileByPath(path);
-		if (file != null) {
-			await vault.delete(file);
-		}
-		await vault.create(path, mdContent);
-	}
-}
