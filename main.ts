@@ -1,5 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, request, Vault, MetadataCache, TFile } from 'obsidian';
-import { stringify } from 'querystring';
+import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile } from 'obsidian';
 
 // Remember to rename these classes and interfaces!
 
