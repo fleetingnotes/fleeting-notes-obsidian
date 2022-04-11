@@ -216,7 +216,7 @@ const getAllNotesRealm = async (email: string, password: string) => {
 	notes = JSON.parse(res)["data"]["notes"]
   } catch (e) {
 	  console.log(e);
-	  throw 'Failed to retrieve notes from the database - Check credentials in settings';
+	  throw 'Failed to retrieve notes from the database - Check credentials in settings & internet connection';
   }
   return notes;
 }
