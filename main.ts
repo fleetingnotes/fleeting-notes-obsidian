@@ -10,7 +10,7 @@ interface FleetingNotesSettings {
 }
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
-	fleeting_notes_folder: '',
+	fleeting_notes_folder: '/',
 	sync_on_startup: false,
 	username: '',
 	password: '',
@@ -52,71 +52,85 @@ export default class FleetingNotesPlugin extends Plugin {
 	}
 
 	async syncFleetingNotes () {
-		var existingNotes = await this.getExistingFleetingNotes(this.settings.fleeting_notes_folder);
 		try {
 			let notes = await getAllNotesRealm(this.settings.username, this.settings.password);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
 			new Notice('Fleeting Notes sync success!');
 		} catch (e) {
-			console.error(e);
-			new Notice('Fleeing Notes sync failed - please check settings');
+			if (typeof e === 'string') {
+				new Notice(e);
+			} else {
+				new Notice('Fleeing Notes sync failed - please check settings');
+				console.error(e);
+			}
 		}
 	}
+
 	async getExistingFleetingNotes (dir: string) {
-		var files = this.app.vault.getFiles();
 		let noteMap: Map<string, TFile> = new Map<string, TFile>();
-		for (var i = 0; i < files.length; i++) {
-			var file = files[i];
-			var file_id: string;
-			var metadata = await this.app.metadataCache.getFileCache(file);
-			if (metadata.frontmatter){
-				file_id = metadata.frontmatter.id || null;
-			} else {
-				file_id = null
+		try {
+			var files = this.app.vault.getFiles();
+			for (var i = 0; i < files.length; i++) {
+				var file = files[i];
+				var file_id: string;
+				var metadata = await this.app.metadataCache.getFileCache(file);
+				if (metadata && metadata.frontmatter){
+					file_id = metadata.frontmatter.id || null;
+				} else {
+					file_id = null
+				}
+				if (!file.path.startsWith(dir) || file_id == null) {
+					continue
+				}
+				noteMap.set(file_id, file);
 			}
-			if (!file.path.startsWith(dir) || file_id == null) {
-				continue
-			}
-			noteMap.set(file_id, file);
+		} catch (e) {
+			console.error('Failed to Retrieve All Existing Fleeting Notes');
+			console.error(e);
 		}
 		return noteMap;
 	}
+
 	// TODO: add templating in the future
 	async writeNotes (notes: Array<Note>, folder: string) {
-		var folderObj = this.app.vault.getAbstractFileByPath(folder);
-		if (folderObj == null) {
-			await this.app.vault.createFolder(folder);
-		}
-		var existingNotes = await this.getExistingFleetingNotes(folder);
-		for (var i = 0; i < notes.length; i++) {
-			var note = notes[i];
-			var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
-			var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
-			var frontmatter = 
+		try {
+			var existingNotes = await this.getExistingFleetingNotes(folder);
+			var folderObj = this.app.vault.getAbstractFileByPath(folder);
+			if (folderObj == null) {
+				await this.app.vault.createFolder(folder);
+			}
+			for (var i = 0; i < notes.length; i++) {
+				var note = notes[i];
+				var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
+				var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
+				var frontmatter = 
 `---
 id: ${note._id}
 title: ${title.replace('.md', '')}
 date: ${note.timestamp.substring(0, 10)}
 ---\n`
-			var path = pathJoin([folder, title]);
-			var mdContent = frontmatter + note.content + "\n\n---\n\n" + note.source;
-			var file = existingNotes.get(note._id) || null;
-			if (file != null) {
-				// modify file if id exists in frontmatter
-				await this.app.vault.modify(file, mdContent);
-			} else {
-				// recreate file otherwise
-				var delFile = this.app.vault.getAbstractFileByPath(path);
-				if (delFile != null) {
-					await this.app.vault.delete(delFile);
+				var path = pathJoin([folder, title]);
+				var mdContent = frontmatter + note.content + "\n\n---\n\n" + note.source;
+				var file = existingNotes.get(note._id) || null;
+				if (file != null) {
+					// modify file if id exists in frontmatter
+					await this.app.vault.modify(file, mdContent);
+				} else {
+					// recreate file otherwise
+					var delFile = this.app.vault.getAbstractFileByPath(path);
+					if (delFile != null) {
+						await this.app.vault.delete(delFile);
+					}
+					await this.app.vault.create(path, mdContent);
 				}
-				await this.app.vault.create(path, mdContent);
+				
 			}
-			
+		} catch (e) {
+			console.log(e);
+			throw 'Failed to write notes to Obsidian - Check `folder location` is not empty in settings';
 		}
 	}
-
 }
 
 class FleetingNotesSettingTab extends PluginSettingTab {
@@ -186,19 +200,24 @@ function pathJoin(parts: Array<string>, sep: string = '/'){
 
 // takes in API key & query
 const getAllNotesRealm = async (email: string, password: string) => {
-  const query = `{"query":"query {  notes {    _id    title    content    source    timestamp   _isDeleted}}"}'`
   let notes = [];
-  const config = {
-    method: 'post',
-    url: 'https://realm.mongodb.com/api/client/v2.0/app/fleeting-notes-knojs/graphql',
-    headers: { 
-      'email': email,
-      'password': password,
-    },
-    body: query,
-  };
-  const res = await request(config);
-  notes = JSON.parse(res)["data"]["notes"]
+  try {
+	const query = `{"query":"query {  notes {    _id    title    content    source    timestamp   _isDeleted}}"}'`
+	const config = {
+		method: 'post',
+		url: 'https://realm.mongodb.com/api/client/v2.0/app/fleeting-notes-knojs/graphql',
+		headers: { 
+		'email': email,
+		'password': password,
+		},
+		body: query,
+	};
+	const res = await request(config);
+	notes = JSON.parse(res)["data"]["notes"]
+  } catch (e) {
+	  console.log(e);
+	  throw 'Failed to retrieve notes from the database - Check credentials in settings & internet connection';
+  }
   return notes;
 }
 
