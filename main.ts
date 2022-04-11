@@ -80,7 +80,8 @@ export default class FleetingNotesPlugin extends Plugin {
 				} else {
 					file_id = null
 				}
-				if (!file.path.startsWith(dir) || file_id == null) {
+				var fileInDir = (dir === '/') ? !file.path.contains('/') : file.path.startsWith(dir);
+				if (!fileInDir || file_id == null) {
 					continue
 				}
 				noteMap.set(file_id, file);
@@ -92,8 +93,16 @@ export default class FleetingNotesPlugin extends Plugin {
 		return noteMap;
 	}
 
+	// paths in obsidian are weird, need function to convert to proper path
+	convertObsidianPath(path: string) {
+		path = (path[0] === '/') ? path.replace('/', '') : path;
+		path = path || '/';
+		return path;
+	}
+
 	// TODO: add templating in the future
 	async writeNotes (notes: Array<Note>, folder: string) {
+		folder = this.convertObsidianPath(folder);
 		try {
 			var existingNotes = await this.getExistingFleetingNotes(folder);
 			var folderObj = this.app.vault.getAbstractFileByPath(folder);
@@ -110,7 +119,7 @@ id: ${note._id}
 title: ${title.replace('.md', '')}
 date: ${note.timestamp.substring(0, 10)}
 ---\n`
-				var path = pathJoin([folder, title]);
+				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				var mdContent = frontmatter + note.content + "\n\n---\n\n" + note.source;
 				var file = existingNotes.get(note._id) || null;
 				if (file != null) {
