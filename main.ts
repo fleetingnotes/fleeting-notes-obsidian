@@ -10,7 +10,7 @@ interface FleetingNotesSettings {
 }
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
-	fleeting_notes_folder: '',
+	fleeting_notes_folder: '/',
 	sync_on_startup: false,
 	username: '',
 	password: '',
@@ -128,7 +128,7 @@ date: ${note.timestamp.substring(0, 10)}
 			}
 		} catch (e) {
 			console.log(e);
-			throw 'Failed to write notes to Obsidian';
+			throw 'Failed to write notes to Obsidian - Check `folder location` is not empty in settings';
 		}
 	}
 }
@@ -216,7 +216,7 @@ const getAllNotesRealm = async (email: string, password: string) => {
 	notes = JSON.parse(res)["data"]["notes"]
   } catch (e) {
 	  console.log(e);
-	  throw 'Failed to retrieve all notes from Realm';
+	  throw 'Failed to retrieve notes from the database - Check credentials in settings';
   }
   return notes;
 }
