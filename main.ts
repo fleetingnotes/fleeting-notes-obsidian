@@ -53,7 +53,7 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	async syncFleetingNotes () {
 		try {
-			let notes = await getAllNotesRealm(this.settings.username, this.settings.password);
+			let notes = await getAllNotesFirebase(this.settings.username, this.settings.password);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
 			new Notice('Fleeting Notes sync success!');
@@ -230,6 +230,28 @@ const getAllNotesRealm = async (email: string, password: string) => {
   return notes;
 }
 
+// takes in API key & query
+const getAllNotesFirebase = async (email: string, password: string) => {
+  let notes = [];
+  try {
+	const body = {
+		'email': email,
+		'password': password,
+	}
+	const config = {
+		method: 'post',
+		url: 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net/get_all_notes',
+		contentType: 'application/json',
+		body: JSON.stringify(body),
+	};
+	const res = await request(config);
+	notes = JSON.parse(res);
+  } catch (e) {
+	  console.log(e);
+	  throw 'Failed to retrieve notes from the database - Check credentials in settings & internet connection';
+  }
+  return notes;
+}
 interface Note {
 	_id: string,
 	title: string,
