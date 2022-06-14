@@ -105,8 +105,8 @@ export default class FleetingNotesPlugin extends Plugin {
 		folder = this.convertObsidianPath(folder);
 		try {
 			var existingNotes = await this.getExistingFleetingNotes(folder);
-			var folderObj = this.app.vault.getAbstractFileByPath(folder);
-			if (folderObj == null) {
+			var folderExists = this.app.vault.adapter.exists(folder);
+			if (!folderExists) {
 				await this.app.vault.createFolder(folder);
 			}
 			for (var i = 0; i < notes.length; i++) {
