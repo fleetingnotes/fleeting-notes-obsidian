@@ -4,6 +4,7 @@ import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile } from '
 
 interface FleetingNotesSettings {
 	fleeting_notes_folder: string;
+	note_template: string;
 	sync_on_startup: boolean;
 	username: string;
 	password: string;
@@ -11,6 +12,7 @@ interface FleetingNotesSettings {
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	fleeting_notes_folder: '/',
+	note_template: "---\nid: ${id}\ntitle: ${title}\ndate: ${datetime}\n---\n${content}\n\n---\n\n${source}",
 	sync_on_startup: false,
 	username: '',
 	password: '',
@@ -100,12 +102,25 @@ export default class FleetingNotesPlugin extends Plugin {
 		return path;
 	}
 
+	getFilledTemplate(template: string, note: Note) {
+		var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
+		var title = (note.title) ? `${note.title}` : `${newTs}`;
+		var newTemplate = template
+			.replace(/\$\{id\}/gm, note._id)
+			.replace(/\$\{title\}/gm, title)
+			.replace(/\$\{datetime\}/gm, note.timestamp.substring(0.10))
+			.replace(/\$\{content\}/gm, note.content)
+			.replace(/\$\{source\}/gm, note.source);
+
+		return newTemplate;
+	}
+
 	// TODO: add templating in the future
 	async writeNotes (notes: Array<Note>, folder: string) {
 		folder = this.convertObsidianPath(folder);
 		try {
 			var existingNotes = await this.getExistingFleetingNotes(folder);
-			var folderExists = this.app.vault.adapter.exists(folder);
+			var folderExists = await this.app.vault.adapter.exists(folder);
 			if (!folderExists) {
 				await this.app.vault.createFolder(folder);
 			}
@@ -113,14 +128,8 @@ export default class FleetingNotesPlugin extends Plugin {
 				var note = notes[i];
 				var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
 				var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
-				var frontmatter = 
-`---
-id: ${note._id}
-title: ${title.replace('.md', '')}
-date: ${note.timestamp.substring(0, 10)}
----\n`
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
-				var mdContent = frontmatter + note.content + "\n\n---\n\n" + note.source;
+				var mdContent = this.getFilledTemplate(this.settings.note_template, note);
 				var file = existingNotes.get(note._id) || null;
 				if (file != null) {
 					// modify file if id exists in frontmatter
@@ -196,6 +205,34 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 					this.plugin.settings.sync_on_startup = val;
 					await this.plugin.saveSettings();
 				}));
+			
+		containerEl.createEl("hr");
+		new Setting(containerEl)
+				.setHeading()
+				.setName('Note Template')
+		new Setting(containerEl)
+			.setHeading()
+			.addTextArea(t => {
+				t
+					.setValue(this.plugin.settings.note_template)
+					.onChange(async (val) => {
+						this.plugin.settings.note_template = val;
+						await this.plugin.saveSettings();
+					});
+				t.inputEl.setAttr("rows", 10);
+				t.inputEl.addClass("note_template");
+			})
+			.addExtraButton(cb => {
+				cb
+					.setIcon("sync")
+					.setTooltip("Refresh template")
+					.onClick(() => {
+						this.plugin.settings.note_template = DEFAULT_SETTINGS.note_template;
+						this.plugin.saveSettings();
+						this.display();
+					});
+				
+			})
 	}
 }
 
