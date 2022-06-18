@@ -271,15 +271,14 @@ const getAllNotesRealm = async (email: string, password: string) => {
 const getAllNotesFirebase = async (email: string, password: string) => {
   let notes = [];
   try {
-	const body = {
-		'email': email,
-		'password': password,
-	}
+	const base64Auth = Buffer.from(`${email}:${password}`).toString('base64');
 	const config = {
 		method: 'post',
 		url: 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net/get_all_notes',
 		contentType: 'application/json',
-		body: JSON.stringify(body),
+		headers: {
+			"Authorization": `Basic ${base64Auth}`,
+		}
 	};
 	const res = await request(config);
 	notes = JSON.parse(res);
