@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile, parseYaml } from 'obsidian';
 
 // Remember to rename these classes and interfaces!
 
@@ -6,14 +6,16 @@ interface FleetingNotesSettings {
 	fleeting_notes_folder: string;
 	note_template: string;
 	sync_on_startup: boolean;
+	last_sync_time: Date;
 	username: string;
 	password: string;
 }
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	fleeting_notes_folder: '/',
-	note_template: "---\nid: ${id}\ntitle: ${title}\ndate: ${datetime}\n---\n${content}\n\n---\n\n${source}",
+	note_template: "---\nid: ${id}\nsource: ${source}\n---\n${content}",
 	sync_on_startup: false,
+	last_sync_time: new Date(0),
 	username: '',
 	password: '',
 }
@@ -26,7 +28,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		// This forces fleeting notes to sync with obsidian
 		this.addCommand({
 			id: 'sync-fleeting-notes',
-			name: 'Pull All Notes from Fleeting Notes',
+			name: 'Sync Notes with Fleeting Notes',
 			callback: async () => {
 				this.syncFleetingNotes();
 			}
@@ -55,9 +57,11 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	async syncFleetingNotes () {
 		try {
+			await this.pushFleetingNotes();
 			let notes = await getAllNotesFirebase(this.settings.username, this.settings.password);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
+			this.settings.last_sync_time = new Date();
 			new Notice('Fleeting Notes sync success!');
 		} catch (e) {
 			if (typeof e === 'string') {
@@ -66,6 +70,34 @@ export default class FleetingNotesPlugin extends Plugin {
 				new Notice('Fleeing Notes sync failed - please check settings');
 				console.error(e);
 			}
+		}
+	}
+	async parseNoteFile(file: TFile): Promise<{ frontmatter: any, content: string }> {
+		var rawNoteContent = await this.app.vault.read(file)
+		var frontmatter = {};
+		var content = rawNoteContent;
+		var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
+		if (m) {
+			frontmatter = parseYaml(m[1]);
+			content = content.replace(m[0], '');
+		}
+		return { frontmatter, content };
+	}
+
+	async pushFleetingNotes () {
+		var modifiedNotes = await this.getUpdatedLocalNotes(this.settings.fleeting_notes_folder);
+		var formattedNotes = await Promise.all(modifiedNotes.map(async (note) => {
+			var { frontmatter, content } = await this.parseNoteFile(note);
+			return {
+				'_id': frontmatter.id,
+				'title': note.basename,
+				'content': content,
+				'source': frontmatter.source,
+			};
+		}));
+		if (formattedNotes.length > 0) {
+			await updateNotesFirebase(this.settings.username, this.settings.password, formattedNotes);
+			this.settings.last_sync_time = new Date();
 		}
 	}
 
@@ -115,7 +147,18 @@ export default class FleetingNotesPlugin extends Plugin {
 		return newTemplate;
 	}
 
-	// TODO: add templating in the future
+	async getUpdatedLocalNotes(folder: string) {
+		folder = this.convertObsidianPath(folder);
+		var existingNotes = Array.from((await this.getExistingFleetingNotes(folder)).values());
+		var frontmatters = await Promise.all(existingNotes.map(async note => (await this.parseNoteFile(note)).frontmatter));
+		var modifiedNotes = existingNotes.filter((note, i) => {
+			const isContentModified = new Date(note.stat.mtime) > this.settings.last_sync_time;
+			const isTitleChanged = frontmatters[i].title !== note.basename;
+			return isContentModified || isTitleChanged;
+		});
+		return modifiedNotes;
+	}
+
 	async writeNotes (notes: Array<Note>, folder: string) {
 		folder = this.convertObsidianPath(folder);
 		try {
@@ -134,6 +177,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				if (file != null) {
 					// modify file if id exists in frontmatter
 					await this.app.vault.modify(file, mdContent);
+					await this.app.vault.rename(file, path);
 				} else {
 					// recreate file otherwise
 					var delFile = this.app.vault.getAbstractFileByPath(path);
@@ -189,13 +233,16 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Password')
-			.addText(text => text
-				.setPlaceholder('Enter password')
-				.setValue(this.plugin.settings.password)
-				.onChange(async (value) => {
-					this.plugin.settings.password = value;
-					await this.plugin.saveSettings();
-				}));
+			.addText(text => {
+				text
+					.setPlaceholder('Enter password')
+					.setValue(this.plugin.settings.password)
+					.onChange(async (value) => {
+						this.plugin.settings.password = value;
+						await this.plugin.saveSettings();
+					})
+				text.inputEl.type = 'password';
+			});
 
 		new Setting(containerEl)
 			.setName('Sync notes on startup')
@@ -267,6 +314,7 @@ const getAllNotesRealm = async (email: string, password: string) => {
   return notes;
 }
 
+const firebaseUrl = 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net';
 // takes in API key & query
 const getAllNotesFirebase = async (email: string, password: string) => {
   let notes = [];
@@ -274,7 +322,7 @@ const getAllNotesFirebase = async (email: string, password: string) => {
 	const base64Auth = btoa(`${email}:${password}`);
 	const config = {
 		method: 'post',
-		url: 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net/get_all_notes',
+		url: `${firebaseUrl}/get_all_notes`,
 		contentType: 'application/json',
 		headers: {
 			"Authorization": `Basic ${base64Auth}`,
@@ -288,6 +336,26 @@ const getAllNotesFirebase = async (email: string, password: string) => {
   }
   return notes;
 }
+
+const updateNotesFirebase = async (email:string, password:string, notes: Array<any>)  => {
+	try {
+		const base64Auth = btoa(`${email}:${password}`);
+		const config = {
+			method: 'post',
+			url: `${firebaseUrl}/update_notes`,
+			contentType: 'application/json',
+			headers: {
+				"Authorization": `Basic ${base64Auth}`,
+				"notes": JSON.stringify(notes),
+			}
+		};
+		await request(config);
+	} catch (e) {
+		console.log(e);
+		throw 'Failed to update notes in the database - Check credentials in settings & internet connection';
+	}
+}
+
 interface Note {
 	_id: string,
 	title: string,
@@ -296,4 +364,3 @@ interface Note {
 	source: string,
 	_isDeleted: boolean,
 }
-
