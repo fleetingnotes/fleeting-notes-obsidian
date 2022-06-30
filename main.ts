@@ -13,7 +13,7 @@ interface FleetingNotesSettings {
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	fleeting_notes_folder: '/',
-	note_template: "---\nid: ${id}\nsource: ${source}\n---\n${content}",
+	note_template: '---\nid: "${id}"\ntitle: "${title}"\nsource: "${source}"\n---\n${content}',
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
 	username: '',
@@ -86,13 +86,13 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	async pushFleetingNotes () {
 		var modifiedNotes = await this.getUpdatedLocalNotes(this.settings.fleeting_notes_folder);
-		var formattedNotes = await Promise.all(modifiedNotes.map(async (note) => {
-			var { frontmatter, content } = await this.parseNoteFile(note);
+		var formattedNotes = await Promise.all(modifiedNotes.map(async (file) => {
+			var { frontmatter, content } = await this.parseNoteFile(file);
 			return {
 				'_id': frontmatter.id,
-				'title': note.basename,
-				'content': content,
-				'source': frontmatter.source,
+				'title': (frontmatter.title) ? file.basename : '',
+				'content': content || '',
+				'source': frontmatter.source || '',
 			};
 		}));
 		if (formattedNotes.length > 0) {
@@ -108,12 +108,8 @@ export default class FleetingNotesPlugin extends Plugin {
 			for (var i = 0; i < files.length; i++) {
 				var file = files[i];
 				var file_id: string;
-				var metadata = await this.app.metadataCache.getFileCache(file);
-				if (metadata && metadata.frontmatter){
-					file_id = metadata.frontmatter.id || null;
-				} else {
-					file_id = null
-				}
+				var { frontmatter } = await this.parseNoteFile(file);
+				file_id = frontmatter.id || null;
 				var fileInDir = (dir === '/') ? !file.path.contains('/') : file.path.startsWith(dir);
 				if (!fileInDir || file_id == null) {
 					continue
@@ -135,11 +131,9 @@ export default class FleetingNotesPlugin extends Plugin {
 	}
 
 	getFilledTemplate(template: string, note: Note) {
-		var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
-		var title = (note.title) ? `${note.title}` : `${newTs}`;
 		var newTemplate = template
 			.replace(/\$\{id\}/gm, note._id)
-			.replace(/\$\{title\}/gm, title)
+			.replace(/\$\{title\}/gm, note.title)
 			.replace(/\$\{datetime\}/gm, note.timestamp.substring(0.10))
 			.replace(/\$\{content\}/gm, note.content)
 			.replace(/\$\{source\}/gm, note.source);
@@ -153,7 +147,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		var frontmatters = await Promise.all(existingNotes.map(async note => (await this.parseNoteFile(note)).frontmatter));
 		var modifiedNotes = existingNotes.filter((note, i) => {
 			const isContentModified = new Date(note.stat.mtime) > this.settings.last_sync_time;
-			const isTitleChanged = frontmatters[i].title !== note.basename;
+			const isTitleChanged = frontmatters[i].title && frontmatters[i].title !== note.basename;
 			return isContentModified || isTitleChanged;
 		});
 		return modifiedNotes;
@@ -169,8 +163,7 @@ export default class FleetingNotesPlugin extends Plugin {
 			}
 			for (var i = 0; i < notes.length; i++) {
 				var note = notes[i];
-				var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
-				var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
+				var title = (note.title) ? `${note.title}.md` : `${note._id}.md`;
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				var mdContent = this.getFilledTemplate(this.settings.note_template, note);
 				var file = existingNotes.get(note._id) || null;
@@ -314,7 +307,7 @@ const getAllNotesRealm = async (email: string, password: string) => {
   return notes;
 }
 
-const firebaseUrl = 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net';
+const firebaseUrl = 'http://localhost:5001/fleetingnotes-22f77/us-central1';
 // takes in API key & query
 const getAllNotesFirebase = async (email: string, password: string) => {
   let notes = [];
