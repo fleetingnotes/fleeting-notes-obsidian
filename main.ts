@@ -55,13 +55,17 @@ export default class FleetingNotesPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	// syncs changes between obsidian and fleeting notes
 	async syncFleetingNotes () {
 		try {
 			await this.pushFleetingNotes();
+
+			// pull fleeting notes
 			let notes = await getAllNotesFirebase(this.settings.username, this.settings.password);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
 			this.settings.last_sync_time = new Date();
+
 			new Notice('Fleeting Notes sync success!');
 		} catch (e) {
 			if (typeof e === 'string') {
@@ -72,6 +76,8 @@ export default class FleetingNotesPlugin extends Plugin {
 			}
 		}
 	}
+
+	// returns the frontmatter and content from a note file
 	async parseNoteFile(file: TFile): Promise<{ frontmatter: any, content: string }> {
 		var rawNoteContent = await this.app.vault.read(file)
 		var frontmatter = {};
@@ -84,6 +90,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		return { frontmatter, content };
 	}
 
+	// writes fleeting notes to firebase
 	async pushFleetingNotes () {
 		var modifiedNotes = await this.getUpdatedLocalNotes(this.settings.fleeting_notes_folder);
 		var formattedNotes = await Promise.all(modifiedNotes.map(async (file) => {
@@ -101,6 +108,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 	}
 
+	// gets all Fleeting Notes from obsidian
 	async getExistingFleetingNotes (dir: string) {
 		let noteMap: Map<string, TFile> = new Map<string, TFile>();
 		try {
@@ -130,6 +138,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		return path;
 	}
 
+	// fills the template with the note data
 	getFilledTemplate(template: string, note: Note) {
 		var newTemplate = template
 			.replace(/\$\{id\}/gm, note._id)
@@ -141,6 +150,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		return newTemplate;
 	}
 
+	// returns a list of files that have been modified since the last sync
 	async getUpdatedLocalNotes(folder: string) {
 		folder = this.convertObsidianPath(folder);
 		var existingNotes = Array.from((await this.getExistingFleetingNotes(folder)).values());
@@ -153,6 +163,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		return modifiedNotes;
 	}
 
+	// writes notes to obsidian
 	async writeNotes (notes: Array<Note>, folder: string) {
 		folder = this.convertObsidianPath(folder);
 		try {
@@ -182,7 +193,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				
 			}
 		} catch (e) {
-			console.log(e);
+			console.error(e);
 			throw 'Failed to write notes to Obsidian - Check `folder location` is not empty in settings';
 		}
 	}
@@ -284,29 +295,6 @@ function pathJoin(parts: Array<string>, sep: string = '/'){
   return parts.join(separator).replace(replace, separator);
 }
 
-// takes in API key & query
-const getAllNotesRealm = async (email: string, password: string) => {
-  let notes = [];
-  try {
-	const query = `{"query":"query {  notes {    _id    title    content    source    timestamp   _isDeleted}}"}'`
-	const config = {
-		method: 'post',
-		url: 'https://realm.mongodb.com/api/client/v2.0/app/fleeting-notes-knojs/graphql',
-		headers: { 
-		'email': email,
-		'password': password,
-		},
-		body: query,
-	};
-	const res = await request(config);
-	notes = JSON.parse(res)["data"]["notes"]
-  } catch (e) {
-	  console.log(e);
-	  throw 'Failed to retrieve notes from the database - Check credentials in settings & internet connection';
-  }
-  return notes;
-}
-
 const firebaseUrl = 'http://localhost:5001/fleetingnotes-22f77/us-central1';
 // takes in API key & query
 const getAllNotesFirebase = async (email: string, password: string) => {
@@ -324,7 +312,7 @@ const getAllNotesFirebase = async (email: string, password: string) => {
 	const res = await request(config);
 	notes = JSON.parse(res);
   } catch (e) {
-	  console.log(e);
+	  console.error(e);
 	  throw 'Failed to retrieve notes from the database - Check credentials in settings & internet connection';
   }
   return notes;
@@ -344,7 +332,7 @@ const updateNotesFirebase = async (email:string, password:string, notes: Array<a
 		};
 		await request(config);
 	} catch (e) {
-		console.log(e);
+		console.error(e);
 		throw 'Failed to update notes in the database - Check credentials in settings & internet connection';
 	}
 }
