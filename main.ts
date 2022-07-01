@@ -39,7 +39,10 @@ export default class FleetingNotesPlugin extends Plugin {
 
 		// syncs on startup
 		if (this.settings.sync_on_startup) {
-			this.syncFleetingNotes();
+			// Files might not be loaded yet
+			this.app.workspace.onLayoutReady(() => {
+				this.syncFleetingNotes();
+			})
 		}
 	}
 
@@ -84,8 +87,13 @@ export default class FleetingNotesPlugin extends Plugin {
 		var content = rawNoteContent;
 		var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
 		if (m) {
-			frontmatter = parseYaml(m[1]);
-			content = content.replace(m[0], '');
+			try {
+				frontmatter = parseYaml(m[1]);
+				content = content.replace(m[0], '');
+			} catch (e) {
+				console.error('Failed to parse frontmatter for ' + file.path);
+				console.error(e);
+			}
 		}
 		return { frontmatter, content };
 	}
