@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile, parseYaml } from 'obsidian';
 
 // Remember to rename these classes and interfaces!
 
@@ -6,14 +6,16 @@ interface FleetingNotesSettings {
 	fleeting_notes_folder: string;
 	note_template: string;
 	sync_on_startup: boolean;
+	last_sync_time: Date;
 	username: string;
 	password: string;
 }
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	fleeting_notes_folder: '/',
-	note_template: "---\nid: ${id}\ntitle: ${title}\ndate: ${datetime}\n---\n${content}\n\n---\n\n${source}",
+	note_template: '---\nid: "${id}"\ntitle: "${title}"\nsource: "${source}"\n---\n${content}',
 	sync_on_startup: false,
+	last_sync_time: new Date(0),
 	username: '',
 	password: '',
 }
@@ -26,7 +28,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		// This forces fleeting notes to sync with obsidian
 		this.addCommand({
 			id: 'sync-fleeting-notes',
-			name: 'Pull All Notes from Fleeting Notes',
+			name: 'Sync Notes with Fleeting Notes',
 			callback: async () => {
 				this.syncFleetingNotes();
 			}
@@ -37,7 +39,10 @@ export default class FleetingNotesPlugin extends Plugin {
 
 		// syncs on startup
 		if (this.settings.sync_on_startup) {
-			this.syncFleetingNotes();
+			// Files might not be loaded yet
+			this.app.workspace.onLayoutReady(() => {
+				this.syncFleetingNotes();
+			})
 		}
 	}
 
@@ -53,11 +58,17 @@ export default class FleetingNotesPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	// syncs changes between obsidian and fleeting notes
 	async syncFleetingNotes () {
 		try {
+			await this.pushFleetingNotes();
+
+			// pull fleeting notes
 			let notes = await getAllNotesFirebase(this.settings.username, this.settings.password);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
+			this.settings.last_sync_time = new Date();
+
 			new Notice('Fleeting Notes sync success!');
 		} catch (e) {
 			if (typeof e === 'string') {
@@ -69,6 +80,43 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 	}
 
+	// returns the frontmatter and content from a note file
+	async parseNoteFile(file: TFile): Promise<{ frontmatter: any, content: string }> {
+		var rawNoteContent = await this.app.vault.read(file)
+		var frontmatter = {};
+		var content = rawNoteContent;
+		var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
+		if (m) {
+			try {
+				frontmatter = parseYaml(m[1]);
+				content = content.replace(m[0], '');
+			} catch (e) {
+				console.error('Failed to parse frontmatter for ' + file.path);
+				console.error(e);
+			}
+		}
+		return { frontmatter, content };
+	}
+
+	// writes fleeting notes to firebase
+	async pushFleetingNotes () {
+		var modifiedNotes = await this.getUpdatedLocalNotes(this.settings.fleeting_notes_folder);
+		var formattedNotes = await Promise.all(modifiedNotes.map(async (file) => {
+			var { frontmatter, content } = await this.parseNoteFile(file);
+			return {
+				'_id': frontmatter.id,
+				'title': (frontmatter.title) ? file.basename : '',
+				'content': content || '',
+				'source': frontmatter.source || '',
+			};
+		}));
+		if (formattedNotes.length > 0) {
+			await updateNotesFirebase(this.settings.username, this.settings.password, formattedNotes);
+			this.settings.last_sync_time = new Date();
+		}
+	}
+
+	// gets all Fleeting Notes from obsidian
 	async getExistingFleetingNotes (dir: string) {
 		let noteMap: Map<string, TFile> = new Map<string, TFile>();
 		try {
@@ -76,12 +124,8 @@ export default class FleetingNotesPlugin extends Plugin {
 			for (var i = 0; i < files.length; i++) {
 				var file = files[i];
 				var file_id: string;
-				var metadata = await this.app.metadataCache.getFileCache(file);
-				if (metadata && metadata.frontmatter){
-					file_id = metadata.frontmatter.id || null;
-				} else {
-					file_id = null
-				}
+				var { frontmatter } = await this.parseNoteFile(file);
+				file_id = frontmatter.id || null;
 				var fileInDir = (dir === '/') ? !file.path.contains('/') : file.path.startsWith(dir);
 				if (!fileInDir || file_id == null) {
 					continue
@@ -102,12 +146,11 @@ export default class FleetingNotesPlugin extends Plugin {
 		return path;
 	}
 
+	// fills the template with the note data
 	getFilledTemplate(template: string, note: Note) {
-		var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
-		var title = (note.title) ? `${note.title}` : `${newTs}`;
 		var newTemplate = template
 			.replace(/\$\{id\}/gm, note._id)
-			.replace(/\$\{title\}/gm, title)
+			.replace(/\$\{title\}/gm, note.title)
 			.replace(/\$\{datetime\}/gm, note.timestamp.substring(0.10))
 			.replace(/\$\{content\}/gm, note.content)
 			.replace(/\$\{source\}/gm, note.source);
@@ -115,7 +158,20 @@ export default class FleetingNotesPlugin extends Plugin {
 		return newTemplate;
 	}
 
-	// TODO: add templating in the future
+	// returns a list of files that have been modified since the last sync
+	async getUpdatedLocalNotes(folder: string) {
+		folder = this.convertObsidianPath(folder);
+		var existingNotes = Array.from((await this.getExistingFleetingNotes(folder)).values());
+		var frontmatters = await Promise.all(existingNotes.map(async note => (await this.parseNoteFile(note)).frontmatter));
+		var modifiedNotes = existingNotes.filter((note, i) => {
+			const isContentModified = new Date(note.stat.mtime) > this.settings.last_sync_time;
+			const isTitleChanged = frontmatters[i].title && frontmatters[i].title !== note.basename;
+			return isContentModified || isTitleChanged;
+		});
+		return modifiedNotes;
+	}
+
+	// writes notes to obsidian
 	async writeNotes (notes: Array<Note>, folder: string) {
 		folder = this.convertObsidianPath(folder);
 		try {
@@ -126,14 +182,14 @@ export default class FleetingNotesPlugin extends Plugin {
 			}
 			for (var i = 0; i < notes.length; i++) {
 				var note = notes[i];
-				var newTs = note.timestamp.replace(':', 'h').replace(':', 'm') + 's';
-				var title = (note.title) ? `${note.title}.md` : `${newTs}.md`;
+				var title = (note.title) ? `${note.title}.md` : `${note._id}.md`;
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				var mdContent = this.getFilledTemplate(this.settings.note_template, note);
 				var file = existingNotes.get(note._id) || null;
 				if (file != null) {
 					// modify file if id exists in frontmatter
 					await this.app.vault.modify(file, mdContent);
+					await this.app.vault.rename(file, path);
 				} else {
 					// recreate file otherwise
 					var delFile = this.app.vault.getAbstractFileByPath(path);
@@ -145,7 +201,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				
 			}
 		} catch (e) {
-			console.log(e);
+			console.error(e);
 			throw 'Failed to write notes to Obsidian - Check `folder location` is not empty in settings';
 		}
 	}
@@ -189,13 +245,16 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Password')
-			.addText(text => text
-				.setPlaceholder('Enter password')
-				.setValue(this.plugin.settings.password)
-				.onChange(async (value) => {
-					this.plugin.settings.password = value;
-					await this.plugin.saveSettings();
-				}));
+			.addText(text => {
+				text
+					.setPlaceholder('Enter password')
+					.setValue(this.plugin.settings.password)
+					.onChange(async (value) => {
+						this.plugin.settings.password = value;
+						await this.plugin.saveSettings();
+					})
+				text.inputEl.type = 'password';
+			});
 
 		new Setting(containerEl)
 			.setName('Sync notes on startup')
@@ -244,29 +303,7 @@ function pathJoin(parts: Array<string>, sep: string = '/'){
   return parts.join(separator).replace(replace, separator);
 }
 
-// takes in API key & query
-const getAllNotesRealm = async (email: string, password: string) => {
-  let notes = [];
-  try {
-	const query = `{"query":"query {  notes {    _id    title    content    source    timestamp   _isDeleted}}"}'`
-	const config = {
-		method: 'post',
-		url: 'https://realm.mongodb.com/api/client/v2.0/app/fleeting-notes-knojs/graphql',
-		headers: { 
-		'email': email,
-		'password': password,
-		},
-		body: query,
-	};
-	const res = await request(config);
-	notes = JSON.parse(res)["data"]["notes"]
-  } catch (e) {
-	  console.log(e);
-	  throw 'Failed to retrieve notes from the database - Check credentials in settings & internet connection';
-  }
-  return notes;
-}
-
+const firebaseUrl = 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net';
 // takes in API key & query
 const getAllNotesFirebase = async (email: string, password: string) => {
   let notes = [];
@@ -274,7 +311,7 @@ const getAllNotesFirebase = async (email: string, password: string) => {
 	const base64Auth = btoa(`${email}:${password}`);
 	const config = {
 		method: 'post',
-		url: 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net/get_all_notes',
+		url: `${firebaseUrl}/get_all_notes`,
 		contentType: 'application/json',
 		headers: {
 			"Authorization": `Basic ${base64Auth}`,
@@ -283,11 +320,31 @@ const getAllNotesFirebase = async (email: string, password: string) => {
 	const res = await request(config);
 	notes = JSON.parse(res);
   } catch (e) {
-	  console.log(e);
+	  console.error(e);
 	  throw 'Failed to retrieve notes from the database - Check credentials in settings & internet connection';
   }
   return notes;
 }
+
+const updateNotesFirebase = async (email:string, password:string, notes: Array<any>)  => {
+	try {
+		const base64Auth = btoa(`${email}:${password}`);
+		const config = {
+			method: 'post',
+			url: `${firebaseUrl}/update_notes`,
+			contentType: 'application/json',
+			headers: {
+				"Authorization": `Basic ${base64Auth}`,
+				"notes": JSON.stringify(notes),
+			}
+		};
+		await request(config);
+	} catch (e) {
+		console.error(e);
+		throw 'Failed to update notes in the database - Check credentials in settings & internet connection';
+	}
+}
+
 interface Note {
 	_id: string,
 	title: string,
@@ -296,4 +353,3 @@ interface Note {
 	source: string,
 	_isDeleted: boolean,
 }
-
