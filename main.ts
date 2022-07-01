@@ -295,7 +295,7 @@ function pathJoin(parts: Array<string>, sep: string = '/'){
   return parts.join(separator).replace(replace, separator);
 }
 
-const firebaseUrl = 'http://localhost:5001/fleetingnotes-22f77/us-central1';
+const firebaseUrl = 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net';
 // takes in API key & query
 const getAllNotesFirebase = async (email: string, password: string) => {
   let notes = [];
