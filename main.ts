@@ -5,6 +5,7 @@ import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile, parseYa
 interface FleetingNotesSettings {
 	fleeting_notes_folder: string;
 	note_template: string;
+	sync_type: string;
 	sync_on_startup: boolean;
 	last_sync_time: Date;
 	username: string;
@@ -13,9 +14,10 @@ interface FleetingNotesSettings {
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	fleeting_notes_folder: '/',
-	note_template: '---\nid: "${id}"\ntitle: "${title}"\nsource: "${source}"\n---\n${content}',
+	note_template: '---\n# Metadata used for sync\nid: "${id}"\ntitle: "${title}"\ncreated: "${datetime}"\nsource: "${source}"\n---\n${content}',
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
+	sync_type: 'one-way',
 	username: '',
 	password: '',
 }
@@ -61,8 +63,9 @@ export default class FleetingNotesPlugin extends Plugin {
 	// syncs changes between obsidian and fleeting notes
 	async syncFleetingNotes () {
 		try {
-			await this.pushFleetingNotes();
-
+			if (this.settings.sync_type === 'two-way') {
+				await this.pushFleetingNotes();
+			}
 			// pull fleeting notes
 			let notes = await getAllNotesFirebase(this.settings.username, this.settings.password);
 			notes = notes.filter((note: Note) => !note._isDeleted);
@@ -220,23 +223,13 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Fleeting Notes Sync Settings'});
+		containerEl.createEl('h2', {text: 'Authentication'});
 
 		new Setting(containerEl)
-			.setName('Fleeting Notes folder location')
-			.setDesc('Files will be populated here from Fleeting Notes')
+			.setName('Email')
+			.setDesc('Email used to log into Fleeting Notes')
 			.addText(text => text
-				.setPlaceholder('Enter the folder location')
-				.setValue(this.plugin.settings.fleeting_notes_folder)
-				.onChange(async (value) => {
-					this.plugin.settings.fleeting_notes_folder = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Username / Email')
-			.addText(text => text
-				.setPlaceholder('Enter username/email')
+				.setPlaceholder('Enter email')
 				.setValue(this.plugin.settings.username)
 				.onChange(async (value) => {
 					this.plugin.settings.username = value;
@@ -255,6 +248,19 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 					})
 				text.inputEl.type = 'password';
 			});
+		
+		containerEl.createEl('h2', {text: 'Sync Settings'});
+
+		new Setting(containerEl)
+			.setName('Fleeting Notes folder location')
+			.setDesc('Files will be populated here from Fleeting Notes')
+			.addText(text => text
+				.setPlaceholder('Enter the folder location')
+				.setValue(this.plugin.settings.fleeting_notes_folder)
+				.onChange(async (value) => {
+					this.plugin.settings.fleeting_notes_folder = value;
+					await this.plugin.saveSettings();
+				}));
 
 		new Setting(containerEl)
 			.setName('Sync notes on startup')
@@ -262,6 +268,17 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.sync_on_startup)
 				.onChange(async (val) => {
 					this.plugin.settings.sync_on_startup = val;
+					await this.plugin.saveSettings();
+				}));
+		
+		new Setting(containerEl)
+			.setName('Sync type:')
+			.addDropdown(dropdown => dropdown
+				.addOption('one-way', 'One-way sync (FN ⇒ Obsidian)')
+				.addOption('two-way', 'Two-way sync (FN ⇔ Obsidian)')
+				.setValue(this.plugin.settings.sync_type)
+				.onChange(async (value) => {
+					this.plugin.settings.sync_type = value;
 					await this.plugin.saveSettings();
 				}));
 			
