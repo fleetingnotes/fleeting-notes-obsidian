@@ -77,67 +77,70 @@ export default class FleetingNotesPlugin extends Plugin {
 			if (typeof e === 'string') {
 				new Notice(e);
 			} else {
-				new Notice('Fleeing Notes sync failed - please check settings');
 				console.error(e);
+				new Notice('Fleeing Notes sync failed - please check settings');
 			}
 		}
 	}
 
 	// returns the frontmatter and content from a note file
 	async parseNoteFile(file: TFile): Promise<{ frontmatter: any, content: string }> {
-		var rawNoteContent = await this.app.vault.read(file)
 		var frontmatter = {};
-		var content = rawNoteContent;
-		var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
-		if (m) {
-			try {
+		var content;
+		try {
+			var rawNoteContent = await this.app.vault.read(file)
+			content = rawNoteContent;
+			var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
+			if (m) {
 				frontmatter = parseYaml(m[1]);
 				content = content.replace(m[0], '');
-			} catch (e) {
-				console.error('Failed to parse frontmatter for ' + file.path);
-				console.error(e);
 			}
+		} catch (e) {
+			throwError(e, `Failed to parse metadata for: "${file.path}"`);
 		}
 		return { frontmatter, content };
 	}
 
 	// writes fleeting notes to firebase
 	async pushFleetingNotes () {
-		var modifiedNotes = await this.getUpdatedLocalNotes(this.settings.fleeting_notes_folder);
-		var formattedNotes = await Promise.all(modifiedNotes.map(async (file) => {
-			var { frontmatter, content } = await this.parseNoteFile(file);
-			return {
-				'_id': frontmatter.id,
-				'title': (frontmatter.title) ? file.basename : '',
-				'content': content || '',
-				'source': frontmatter.source || '',
-			};
-		}));
-		if (formattedNotes.length > 0) {
-			await updateNotesFirebase(this.settings.username, this.settings.password, formattedNotes);
-			this.settings.last_sync_time = new Date();
+		try {
+			var modifiedNotes = await this.getUpdatedLocalNotes(this.settings.fleeting_notes_folder);
+			var formattedNotes = await Promise.all(modifiedNotes.map(async (note) => {
+				var { file, frontmatter, content } = note;
+				return {
+					'_id': frontmatter.id,
+					'title': (frontmatter.title) ? file.basename : '',
+					'content': content || '',
+					'source': frontmatter.source || '',
+				};
+			}));
+			if (formattedNotes.length > 0) {
+				await updateNotesFirebase(this.settings.username, this.settings.password, formattedNotes);
+				this.settings.last_sync_time = new Date();
+			}
+		} catch (e) {
+			throwError(e, 'Failed to push notes from Obsidian to Fleeting Notes');
 		}
 	}
 
 	// gets all Fleeting Notes from obsidian
 	async getExistingFleetingNotes (dir: string) {
-		let noteMap: Map<string, TFile> = new Map<string, TFile>();
+		let noteMap: Map<string, { file: TFile, frontmatter: any, content: string }> = new Map<string, { file: TFile, frontmatter: any, content: string }>();
 		try {
 			var files = this.app.vault.getFiles();
 			for (var i = 0; i < files.length; i++) {
 				var file = files[i];
-				var file_id: string;
-				var { frontmatter } = await this.parseNoteFile(file);
-				file_id = frontmatter.id || null;
 				var fileInDir = (dir === '/') ? !file.path.contains('/') : file.path.startsWith(dir);
-				if (!fileInDir || file_id == null) {
-					continue
+				if (!fileInDir) continue;
+				var file_id: string;
+				var { frontmatter, content } = await this.parseNoteFile(file);
+				file_id = frontmatter.id || null;
+				if (file_id !== null) {
+					noteMap.set(file_id, { file, frontmatter, content });
 				}
-				noteMap.set(file_id, file);
 			}
 		} catch (e) {
-			console.error('Failed to Retrieve All Existing Fleeting Notes');
-			console.error(e);
+			throwError(e, `Failed to get existing notes from obsidian`);
 		}
 		return noteMap;
 	}
@@ -165,10 +168,10 @@ export default class FleetingNotesPlugin extends Plugin {
 	async getUpdatedLocalNotes(folder: string) {
 		folder = this.convertObsidianPath(folder);
 		var existingNotes = Array.from((await this.getExistingFleetingNotes(folder)).values());
-		var frontmatters = await Promise.all(existingNotes.map(async note => (await this.parseNoteFile(note)).frontmatter));
-		var modifiedNotes = existingNotes.filter((note, i) => {
-			const isContentModified = new Date(note.stat.mtime) > this.settings.last_sync_time;
-			const isTitleChanged = frontmatters[i].title && frontmatters[i].title !== note.basename;
+		var modifiedNotes = existingNotes.filter((note) => {
+			const { file, frontmatter } = note;
+			const isContentModified = new Date(file.stat.mtime) > this.settings.last_sync_time;
+			const isTitleChanged = frontmatter.title && frontmatter.title !== file.basename;
 			return isContentModified || isTitleChanged;
 		});
 		return modifiedNotes;
@@ -188,11 +191,11 @@ export default class FleetingNotesPlugin extends Plugin {
 				var title = (note.title) ? `${note.title}.md` : `${note._id}.md`;
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				var mdContent = this.getFilledTemplate(this.settings.note_template, note);
-				var file = existingNotes.get(note._id) || null;
-				if (file != null) {
+				var noteFile = existingNotes.get(note._id) || null;
+				if (noteFile != null) {
 					// modify file if id exists in frontmatter
-					await this.app.vault.modify(file, mdContent);
-					await this.app.vault.rename(file, path);
+					await this.app.vault.modify(noteFile.file, mdContent);
+					await this.app.vault.rename(noteFile.file, path);
 				} else {
 					// recreate file otherwise
 					var delFile = this.app.vault.getAbstractFileByPath(path);
@@ -204,8 +207,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				
 			}
 		} catch (e) {
-			console.error(e);
-			throw 'Failed to write notes to Obsidian - Check `folder location` is not empty in settings';
+			throwError(e, 'Failed to write notes to Obsidian');
 		}
 	}
 }
@@ -320,6 +322,15 @@ function pathJoin(parts: Array<string>, sep: string = '/'){
   return parts.join(separator).replace(replace, separator);
 }
 
+function throwError(e: any, errMessage: string) {
+	if (typeof e === 'string') {
+		throw e;
+	} else {
+		console.error(e);
+		throw errMessage;
+	}
+}
+
 const firebaseUrl = 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net';
 // takes in API key & query
 const getAllNotesFirebase = async (email: string, password: string) => {
@@ -335,10 +346,12 @@ const getAllNotesFirebase = async (email: string, password: string) => {
 		}
 	};
 	const res = await request(config);
+	if (res === 'Unauthorized') {
+		throwError(Error(res), 'Failed to get notes from Fleeting Notes - Check your credentials');
+	}
 	notes = JSON.parse(res);
   } catch (e) {
-	  console.error(e);
-	  throw 'Failed to retrieve notes from the database - Check credentials in settings & internet connection';
+	  throwError(e, 'Failed to get notes from Fleeting Notes - Check your credentials');
   }
   return notes;
 }
@@ -355,10 +368,12 @@ const updateNotesFirebase = async (email:string, password:string, notes: Array<a
 				"notes": JSON.stringify(notes),
 			}
 		};
-		await request(config);
+		const res = await request(config);
+		if (res === 'Unauthorized') {
+			throwError(Error(res), 'Failed to update notes in Fleeting Notes - Check your credentials');
+		}
 	} catch (e) {
-		console.error(e);
-		throw 'Failed to update notes in the database - Check credentials in settings & internet connection';
+		throwError(e, 'Failed to update notes in Fleeting Notes - Check your credentials');
 	}
 }
 
