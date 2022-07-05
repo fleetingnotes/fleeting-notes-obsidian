@@ -190,19 +190,23 @@ export default class FleetingNotesPlugin extends Plugin {
 				var note = notes[i];
 				var title = (note.title) ? `${note.title}.md` : `${note._id}.md`;
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
-				var mdContent = this.getFilledTemplate(this.settings.note_template, note);
-				var noteFile = existingNotes.get(note._id) || null;
-				if (noteFile != null) {
-					// modify file if id exists in frontmatter
-					await this.app.vault.modify(noteFile.file, mdContent);
-					await this.app.vault.rename(noteFile.file, path);
-				} else {
-					// recreate file otherwise
-					var delFile = this.app.vault.getAbstractFileByPath(path);
-					if (delFile != null) {
-						await this.app.vault.delete(delFile);
+				try {
+					var mdContent = this.getFilledTemplate(this.settings.note_template, note);
+					var noteFile = existingNotes.get(note._id) || null;
+					if (noteFile != null) {
+						// modify file if id exists in frontmatter
+						await this.app.vault.modify(noteFile.file, mdContent);
+						await this.app.vault.rename(noteFile.file, path);
+					} else {
+						// recreate file otherwise
+						var delFile = this.app.vault.getAbstractFileByPath(path);
+						if (delFile != null) {
+							await this.app.vault.delete(delFile);
+						}
+						await this.app.vault.create(path, mdContent);
 					}
-					await this.app.vault.create(path, mdContent);
+				} catch (e) {
+					throwError(e, `Failed to write note "${path}" to Obsidian.\n\n${e.message}`);
 				}
 				
 			}
