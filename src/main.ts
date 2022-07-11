@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile, parseYaml } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile, parseYaml, MarkdownView } from 'obsidian';
 
 // Remember to rename these classes and interfaces!
 
@@ -10,6 +10,12 @@ interface FleetingNotesSettings {
 	last_sync_time: Date;
 	username: string;
 	password: string;
+}
+
+interface ObsidianNote {
+	file: TFile,
+	frontmatter: any,
+	content: string
 }
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
@@ -36,6 +42,14 @@ export default class FleetingNotesPlugin extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: 'get-unprocessed-notes',
+			name: 'Insert Unprocessed Notes',
+			callback: async () => {
+				this.insertUnprocessedNotes();
+			}
+		})
+
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FleetingNotesSettingTab(this.app, this));
 
@@ -60,6 +74,21 @@ export default class FleetingNotesPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	async insertUnprocessedNotes() {
+		try {
+			const unprocessedNotes = await this.getUnprocessedFleetingNotes(this.settings.fleeting_notes_folder);
+			const unprocessedNoteString = this.unprocessedNotesToString(unprocessedNotes, this.app.workspace.getActiveFile().path);
+			this.appendStringToActiveFile(unprocessedNoteString);
+		} catch (e) {
+			if (typeof e === 'string') {
+				new Notice(e);
+			} else {
+				console.error(e);
+				new Notice('Failed to insert unprocessed notes');
+			}
+		}
+	}
+
 	// syncs changes between obsidian and fleeting notes
 	async syncFleetingNotes () {
 		try {
@@ -81,6 +110,13 @@ export default class FleetingNotesPlugin extends Plugin {
 				new Notice('Fleeing Notes sync failed - please check settings');
 			}
 		}
+	}
+
+	async appendStringToActiveFile(content: string) {
+		const active_view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const editor = active_view.editor;
+        const doc = editor.getDoc();
+		doc.replaceSelection(content);
 	}
 
 	// returns the frontmatter and content from a note file
@@ -125,7 +161,7 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	// gets all Fleeting Notes from obsidian
 	async getExistingFleetingNotes (dir: string) {
-		let noteMap: Map<string, { file: TFile, frontmatter: any, content: string }> = new Map<string, { file: TFile, frontmatter: any, content: string }>();
+		const noteList: Array<ObsidianNote> = [];
 		try {
 			var files = this.app.vault.getFiles();
 			for (var i = 0; i < files.length; i++) {
@@ -136,13 +172,13 @@ export default class FleetingNotesPlugin extends Plugin {
 				var { frontmatter, content } = await this.parseNoteFile(file);
 				file_id = frontmatter.id || null;
 				if (file_id !== null) {
-					noteMap.set(file_id, { file, frontmatter, content });
+					noteList.push({ file, frontmatter, content });
 				}
 			}
 		} catch (e) {
 			throwError(e, `Failed to get existing notes from obsidian`);
 		}
-		return noteMap;
+		return noteList;
 	}
 
 	// paths in obsidian are weird, need function to convert to proper path
@@ -167,7 +203,7 @@ export default class FleetingNotesPlugin extends Plugin {
 	// returns a list of files that have been modified since the last sync
 	async getUpdatedLocalNotes(folder: string) {
 		folder = this.convertObsidianPath(folder);
-		var existingNotes = Array.from((await this.getExistingFleetingNotes(folder)).values());
+		var existingNotes = await this.getExistingFleetingNotes(folder);
 		var modifiedNotes = existingNotes.filter((note) => {
 			const { file, frontmatter } = note;
 			const isContentModified = new Date(file.stat.mtime) > this.settings.last_sync_time;
@@ -177,11 +213,59 @@ export default class FleetingNotesPlugin extends Plugin {
 		return modifiedNotes;
 	}
 
+	unprocessedNotesToString(notes: Array<ObsidianNote>, sourcePath: string) {
+		let unprocessedNoteString = ""
+		const unprocessedNoteTemplate = "- [ ] ![[${linkText}]]\n";
+		notes.forEach((note) => {
+			const linkText = this.app.metadataCache.fileToLinktext(note.file, sourcePath);
+			unprocessedNoteString += unprocessedNoteTemplate.replace('${linkText}', linkText);
+		});
+		return unprocessedNoteString;
+	}
+
+	async getUnprocessedFleetingNotes(folder: string) {
+		folder = this.convertObsidianPath(folder);
+		let existingNotePathMap: Map<string, ObsidianNote> = new Map<string, ObsidianNote>();
+		var existingNotes = await this.getExistingFleetingNotes(folder);
+		existingNotes.forEach((note) => existingNotePathMap.set(note.file.path, note));
+		let skipNotesSet: Set<string> = new Set();
+
+		const resolvedLinks = this.app.metadataCache.resolvedLinks
+		await Promise.all(Object.keys(resolvedLinks).map(async (filePath) => {
+			// skip existing fleeting notes
+			if (existingNotePathMap.has(filePath)) return;
+			let linksInNote: Array<string> = [];
+			Object.keys(resolvedLinks[filePath]).forEach((linkInNote) => {
+				if (existingNotePathMap.has(linkInNote)) {
+					linksInNote.push(linkInNote);
+				}
+			});	
+			if (linksInNote.length > 0) {
+				const file = await this.app.vault.getAbstractFileByPath(filePath) as TFile;
+				const content = await this.app.vault.read(file);
+				linksInNote.forEach(async (link) => {
+					const note: ObsidianNote = existingNotePathMap.get(link);
+					const fullLink = note.file.path.replace(/\.\w+$/, '')
+					const re = new RegExp(`^- \\[x\\] .*\\[\\[(${fullLink}|${note.file.basename})\\]\\]`, 'm')
+					if (content.match(re)) {
+						skipNotesSet.add(link);
+					}
+				});
+			}
+		}));
+		const unprocessedNotes = existingNotes.filter((note) => {
+			return !skipNotesSet.has(note.file.path);
+		});
+		return unprocessedNotes;
+	}
+
 	// writes notes to obsidian
 	async writeNotes (notes: Array<Note>, folder: string) {
 		folder = this.convertObsidianPath(folder);
+		let existingNoteMap: Map<string, ObsidianNote> = new Map<string, ObsidianNote>();
 		try {
 			var existingNotes = await this.getExistingFleetingNotes(folder);
+			existingNotes.forEach((note) => existingNoteMap.set(note.frontmatter.id, note));
 			var folderExists = await this.app.vault.adapter.exists(folder);
 			if (!folderExists) {
 				await this.app.vault.createFolder(folder);
@@ -192,7 +276,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				try {
 					var mdContent = this.getFilledTemplate(this.settings.note_template, note);
-					var noteFile = existingNotes.get(note._id) || null;
+					var noteFile = existingNoteMap.get(note._id) || null;
 					if (noteFile != null) {
 						// modify file if id exists in frontmatter
 						await this.app.vault.modify(noteFile.file, mdContent);
