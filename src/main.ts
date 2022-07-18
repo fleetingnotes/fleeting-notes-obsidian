@@ -1,4 +1,5 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile, parseYaml, MarkdownView } from 'obsidian';
+var CryptoJS = require("crypto-js");
 
 // Remember to rename these classes and interfaces!
 
@@ -10,6 +11,7 @@ interface FleetingNotesSettings {
 	last_sync_time: Date;
 	username: string;
 	password: string;
+	encryption_key: string;
 }
 
 interface ObsidianNote {
@@ -26,6 +28,7 @@ const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	sync_type: 'one-way',
 	username: '',
 	password: '',
+	encryption_key: '',
 }
 
 export default class FleetingNotesPlugin extends Plugin {
@@ -96,7 +99,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				await this.pushFleetingNotes();
 			}
 			// pull fleeting notes
-			let notes = await getAllNotesFirebase(this.settings.username, this.settings.password);
+			let notes = await getAllNotesFirebase(this.settings.username, this.settings.password, this.settings.encryption_key);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
 			this.settings.last_sync_time = new Date();
@@ -151,7 +154,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				};
 			}));
 			if (formattedNotes.length > 0) {
-				await updateNotesFirebase(this.settings.username, this.settings.password, formattedNotes);
+				await updateNotesFirebase(this.settings.username, this.settings.password, this.settings.encryption_key, formattedNotes);
 				this.settings.last_sync_time = new Date();
 			}
 		} catch (e) {
@@ -338,6 +341,19 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 					})
 				text.inputEl.type = 'password';
 			});
+
+		new Setting(containerEl)
+			.setName('Encryption key')
+			.addText(text => {
+				text
+					.setPlaceholder('Enter encryption key')
+					.setValue(this.plugin.settings.encryption_key)
+					.onChange(async (value) => {
+						this.plugin.settings.encryption_key = value;
+						await this.plugin.saveSettings();
+					})
+				text.inputEl.type = 'password';
+			});
 		
 		containerEl.createEl('h2', {text: 'Sync Settings'});
 
@@ -421,8 +437,8 @@ function throwError(e: any, errMessage: string) {
 
 const firebaseUrl = 'https://us-central1-fleetingnotes-22f77.cloudfunctions.net';
 // takes in API key & query
-const getAllNotesFirebase = async (email: string, password: string) => {
-  let notes = [];
+const getAllNotesFirebase = async (email: string, password: string, key: string) => {
+  let notes: Note[] = [];
   try {
 	const base64Auth = btoa(`${email}:${password}`);
 	const config = {
@@ -431,38 +447,87 @@ const getAllNotesFirebase = async (email: string, password: string) => {
 		contentType: 'application/json',
 		headers: {
 			"Authorization": `Basic ${base64Auth}`,
+			"hashed-encryption-key": CryptoJS.SHA256(key).toString(),
 		}
 	};
-	const res = await request(config);
-	if (res === 'Unauthorized') {
-		throwError(Error(res), 'Failed to get notes from Fleeting Notes - Check your credentials');
+	const res = JSON.parse(await request(config));
+	if (res.error) {
+		throwError(Error(res.error), res.error);
 	}
-	notes = JSON.parse(res);
+	notes = Array.from(res.map((note: any) => decryptNote(note, key)));
+	return notes;
   } catch (e) {
 	  throwError(e, 'Failed to get notes from Fleeting Notes - Check your credentials');
   }
   return notes;
 }
 
-const updateNotesFirebase = async (email:string, password:string, notes: Array<any>)  => {
+const updateNotesFirebase = async (email:string, password:string, key:string, notes: Array<any>)  => {
 	try {
 		const base64Auth = btoa(`${email}:${password}`);
+		var encrypyedNotes = Array.from(notes.map((note: any) => encryptNote(note, key)));
 		const config = {
 			method: 'post',
 			url: `${firebaseUrl}/update_notes`,
 			contentType: 'application/json',
 			headers: {
 				"Authorization": `Basic ${base64Auth}`,
-				"notes": JSON.stringify(notes),
+				"hashed-encryption-key": CryptoJS.SHA256(key).toString(),
+				"notes": JSON.stringify(encrypyedNotes),
 			}
 		};
-		const res = await request(config);
-		if (res === 'Unauthorized') {
-			throwError(Error(res), 'Failed to update notes in Fleeting Notes - Check your credentials');
+		const res = JSON.parse(await request(config));
+		if (res.error) {
+			throwError(Error(res.error), res.error);
 		}
 	} catch (e) {
 		throwError(e, 'Failed to update notes in Fleeting Notes - Check your credentials');
 	}
+}
+
+const decryptNote = (note: any, key: string) => {
+	if (note.is_encrypted) {
+		if (key === '') {
+			throwError(Error('No encryption key found'), 'No encryption key found');
+		}
+		if (note.title) {
+			note.title = decryptText(note.title, key);
+		}
+		if (note.content) {
+			note.content = decryptText(note.content, key);
+		}
+		if (note.source) {
+			note.source = decryptText(note.source, key);
+		}
+	}
+	return note as Note
+}
+
+const encryptNote = (note: any, key: string) => {
+	if (key !== '') {
+		if (note.title) {
+			note.title = encryptText(note.title, key);
+		}
+		if (note.content) {
+			note.content = encryptText(note.content, key);
+		}
+		if (note.source) {
+			note.source = encryptText(note.source, key);
+		}
+		note.is_encrypted = true;
+	}
+	return note as Note
+}
+
+const decryptText = (text: string, key: string) => {
+	var bytes = CryptoJS.AES.decrypt(text, key);
+	var originalText = bytes.toString(CryptoJS.enc.Utf8);
+	return originalText as string;
+}
+
+const encryptText = (text: string, key: string) => {
+	var ciphertext = CryptoJS.AES.encrypt(text, key).toString();
+	return ciphertext as string;
 }
 
 interface Note {
