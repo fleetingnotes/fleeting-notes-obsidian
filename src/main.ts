@@ -189,6 +189,18 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	// fills the template with the note data
 	getFilledTemplate(template: string, note: Note) {
+		const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
+		if (metadataMatch) {
+			const escapedTitle = note.title.replace(/\"/g, '\\"');
+			const escapedContent = note.content.replace(/\"/g, '\\"');
+			const escapedSource = note.source.replace(/\"/g, '\\"');
+			var newMetadata = metadataMatch[0]
+				.replace(/\$\{title\}/gm, escapedTitle)
+				.replace(/\$\{content\}/gm, escapedContent)
+				.replace(/\$\{source\}/gm, escapedSource);
+			template = template.replace(metadataMatch[0], newMetadata);
+		}
+
 		var newTemplate = template
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
