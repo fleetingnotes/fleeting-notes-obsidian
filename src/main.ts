@@ -125,17 +125,16 @@ export default class FleetingNotesPlugin extends Plugin {
 	// returns the frontmatter and content from a note file
 	async parseNoteFile(file: TFile): Promise<{ frontmatter: any, content: string }> {
 		var frontmatter = {};
-		var content;
+		var rawNoteContent = await this.app.vault.read(file)
+		var	content = rawNoteContent;
 		try {
-			var rawNoteContent = await this.app.vault.read(file)
-			content = rawNoteContent;
 			var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
 			if (m) {
 				frontmatter = parseYaml(m[1]);
 				content = content.replace(m[0], '');
 			}
 		} catch (e) {
-			throwError(e, `Failed to parse metadata for: "${file.path}"`);
+			console.error(e, `Failed to parse metadata for: "${file.path}"`)
 		}
 		return { frontmatter, content };
 	}
@@ -193,6 +192,18 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	// fills the template with the note data
 	getFilledTemplate(template: string, note: Note) {
+		const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
+		if (metadataMatch) {
+			const escapedTitle = note.title.replace(/\"/g, '\\"');
+			const escapedContent = note.content.replace(/\"/g, '\\"');
+			const escapedSource = note.source.replace(/\"/g, '\\"');
+			var newMetadata = metadataMatch[0]
+				.replace(/\$\{title\}/gm, escapedTitle)
+				.replace(/\$\{content\}/gm, escapedContent)
+				.replace(/\$\{source\}/gm, escapedSource);
+			template = template.replace(metadataMatch[0], newMetadata);
+		}
+
 		var newTemplate = template
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
