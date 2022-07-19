@@ -465,7 +465,7 @@ const getAllNotesFirebase = async (email: string, password: string, key: string)
 const updateNotesFirebase = async (email:string, password:string, key:string, notes: Array<any>)  => {
 	try {
 		const base64Auth = btoa(`${email}:${password}`);
-		var encrypyedNotes = Array.from(notes.map((note: any) => encryptNote(note, key)));
+		var encryptedNotes = Array.from(notes.map((note: any) => encryptNote(note, key)));
 		const config = {
 			method: 'post',
 			url: `${firebaseUrl}/update_notes`,
@@ -473,7 +473,7 @@ const updateNotesFirebase = async (email:string, password:string, key:string, no
 			headers: {
 				"Authorization": `Basic ${base64Auth}`,
 				"hashed-encryption-key": (key) ? CryptoJS.SHA256(key).toString() : undefined,
-				"notes": JSON.stringify(encrypyedNotes),
+				"notes": JSON.stringify(encryptedNotes),
 			}
 		};
 		const res = JSON.parse(await request(config));
