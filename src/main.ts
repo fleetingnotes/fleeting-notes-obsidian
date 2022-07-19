@@ -447,7 +447,7 @@ const getAllNotesFirebase = async (email: string, password: string, key: string)
 		contentType: 'application/json',
 		headers: {
 			"Authorization": `Basic ${base64Auth}`,
-			"hashed-encryption-key": CryptoJS.SHA256(key).toString(),
+			"hashed-encryption-key": (key) ? CryptoJS.SHA256(key).toString() : undefined,
 		}
 	};
 	const res = JSON.parse(await request(config));
@@ -472,7 +472,7 @@ const updateNotesFirebase = async (email:string, password:string, key:string, no
 			contentType: 'application/json',
 			headers: {
 				"Authorization": `Basic ${base64Auth}`,
-				"hashed-encryption-key": CryptoJS.SHA256(key).toString(),
+				"hashed-encryption-key": (key) ? CryptoJS.SHA256(key).toString() : undefined,
 				"notes": JSON.stringify(encrypyedNotes),
 			}
 		};
