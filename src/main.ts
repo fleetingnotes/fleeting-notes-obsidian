@@ -425,7 +425,7 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 				t.inputEl.setAttr("rows", 10);
 				t.inputEl.addClass("note_template");
 				if (this.plugin.settings.sync_type == 'two-way') {
-					t.inputEl.setAttr("disabled", false);
+					t.inputEl.setAttr("disabled", true);
 				}
 			})
 			.addExtraButton(cb => {
