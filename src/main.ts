@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile, parseYaml, MarkdownView } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting, request, TFile, parseYaml, MarkdownView, TextAreaComponent } from 'obsidian';
 var CryptoJS = require("crypto-js");
 
 // Remember to rename these classes and interfaces!
@@ -324,6 +324,7 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 
 	display(): void {
 		const {containerEl} = this;
+		let noteTemplateComponent: TextAreaComponent;
 
 		containerEl.empty();
 
@@ -396,16 +397,25 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.sync_type)
 				.onChange(async (value) => {
 					this.plugin.settings.sync_type = value;
+					if (noteTemplateComponent) {
+						if (value == 'two-way') {
+							this.plugin.settings.note_template = DEFAULT_SETTINGS.note_template;
+							noteTemplateComponent.setValue(DEFAULT_SETTINGS.note_template);
+							noteTemplateComponent.inputEl.setAttr("disabled", true);
+						} else {
+							noteTemplateComponent.inputEl.removeAttribute("disabled");
+						}
+					}
 					await this.plugin.saveSettings();
 				}));
 			
-		containerEl.createEl("hr");
 		new Setting(containerEl)
-				.setHeading()
-				.setName('Note Template')
+			.setName('Note Template')
+			.setDesc('Only editable in one-way sync')
 		new Setting(containerEl)
 			.setHeading()
 			.addTextArea(t => {
+				noteTemplateComponent = t;
 				t
 					.setValue(this.plugin.settings.note_template)
 					.onChange(async (val) => {
@@ -414,6 +424,9 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 					});
 				t.inputEl.setAttr("rows", 10);
 				t.inputEl.addClass("note_template");
+				if (this.plugin.settings.sync_type == 'two-way') {
+					t.inputEl.setAttr("disabled", false);
+				}
 			})
 			.addExtraButton(cb => {
 				cb
