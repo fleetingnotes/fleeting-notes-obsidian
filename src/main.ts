@@ -12,6 +12,7 @@ interface FleetingNotesSettings {
 	username: string;
 	password: string;
 	encryption_key: string;
+	sync_interval: NodeJS.Timer | undefined;
 }
 
 interface ObsidianNote {
@@ -29,6 +30,7 @@ const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	username: '',
 	password: '',
 	encryption_key: '',
+	sync_interval: undefined,
 }
 
 export default class FleetingNotesPlugin extends Plugin {
@@ -60,13 +62,24 @@ export default class FleetingNotesPlugin extends Plugin {
 		if (this.settings.sync_on_startup) {
 			// Files might not be loaded yet
 			this.app.workspace.onLayoutReady(() => {
-				this.syncFleetingNotes();
+				this.autoSync();
 			})
 		}
 	}
+	disableAutoSync() {
+		if (this.settings.sync_interval) {
+			clearInterval(this.settings.sync_interval);
+		}
+	}
+	autoSync(syncIntervalMin: number = 30) {
+		const syncIntervalMs = syncIntervalMin * 60 * 1000;
+		this.disableAutoSync();
+		this.syncFleetingNotes();
+		this.settings.sync_interval = setInterval(this.syncFleetingNotes.bind(this), syncIntervalMs);
+	}
 
 	onunload() {
-
+		this.disableAutoSync();
 	}
 
 	async loadSettings() {
@@ -343,6 +356,7 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Password')
+			.setDesc('Password used to log into Fleeting Notes')
 			.addText(text => {
 				text
 					.setPlaceholder('Enter password')
@@ -356,6 +370,7 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Encryption key')
+			.setDesc('Encryption key used to encrypt notes')
 			.addText(text => {
 				text
 					.setPlaceholder('Enter encryption key')
@@ -381,11 +396,17 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Sync notes on startup')
+			.setName('Sync notes automatically')
+			.setDesc('Sync will be performed on startup and every 30 minutes')
 			.addToggle(tog => tog
 				.setValue(this.plugin.settings.sync_on_startup)
 				.onChange(async (val) => {
 					this.plugin.settings.sync_on_startup = val;
+					if (val) {
+						this.plugin.autoSync();
+					} else {
+						this.plugin.disableAutoSync();
+					}
 					await this.plugin.saveSettings();
 				}));
 		
