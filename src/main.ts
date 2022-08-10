@@ -115,6 +115,9 @@ export default class FleetingNotesPlugin extends Plugin {
 			let notes = await getAllNotesFirebase(this.settings.username, this.settings.password, this.settings.encryption_key);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
+			if (this.settings.sync_type == 'one-way-delete') {
+				await this.deleteFleetingNotes(notes);
+			}
 			this.settings.last_sync_time = new Date();
 
 			new Notice('Fleeting Notes sync success!');
@@ -163,6 +166,7 @@ export default class FleetingNotesPlugin extends Plugin {
 					'title': (frontmatter.title) ? file.basename : '',
 					'content': content || '',
 					'source': frontmatter.source || '',
+					'_isDeleted': frontmatter.deleted || false,
 				};
 			}));
 			if (formattedNotes.length > 0) {
@@ -174,6 +178,21 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 	}
 
+	async deleteFleetingNotes (notes: Note[]) {
+		try {
+			var notesToDelete = await Promise.all(notes.map(async (note) => {
+				return {
+					'_id': note._id,
+					'_isDeleted': true,
+				}
+			}));
+			if (notesToDelete.length > 0) {
+				await updateNotesFirebase(this.settings.username, this.settings.password, this.settings.encryption_key, notesToDelete);
+			}
+		} catch (e) {
+			throwError(e, 'Failed to delete notes from Fleeting Notes');
+		}
+	}	
 	// gets all Fleeting Notes from obsidian
 	async getExistingFleetingNotes (dir: string) {
 		const noteList: Array<ObsidianNote> = [];
@@ -204,16 +223,25 @@ export default class FleetingNotesPlugin extends Plugin {
 	}
 
 	// fills the template with the note data
-	getFilledTemplate(template: string, note: Note) {
+	getFilledTemplate(template: string, note: Note, add_deleted: boolean) {
 		const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
 		if (metadataMatch) {
 			const escapedTitle = note.title.replace(/\"/g, '\\"');
 			const escapedContent = note.content.replace(/\"/g, '\\"');
 			const escapedSource = note.source.replace(/\"/g, '\\"');
-			var newMetadata = metadataMatch[0]
+			var newMetadata = metadataMatch[1]
 				.replace(/\$\{title\}/gm, escapedTitle)
 				.replace(/\$\{content\}/gm, escapedContent)
 				.replace(/\$\{source\}/gm, escapedSource);
+			if (add_deleted) {
+				const deleted_match = newMetadata.match(/^deleted:.*$/);
+				if (deleted_match) {
+					newMetadata = newMetadata.replace(deleted_match[0], 'deleted: true');
+				} else {
+					newMetadata += '\ndeleted: true';
+				}
+			}
+			newMetadata = `---\n${newMetadata}\n---\n`;
 			template = template.replace(metadataMatch[0], newMetadata);
 		}
 
@@ -302,8 +330,9 @@ export default class FleetingNotesPlugin extends Plugin {
 				var title = (note.title) ? `${note.title}.md` : `${note._id}.md`;
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				try {
-					var mdContent = this.getFilledTemplate(this.settings.note_template, note);
 					var noteFile = existingNoteMap.get(note._id) || null;
+					const add_deleted = this.settings.sync_type === 'one-way-delete';
+					var mdContent = this.getFilledTemplate(this.settings.note_template, note, add_deleted);
 					if (noteFile != null) {
 						// modify file if id exists in frontmatter
 						await this.app.vault.modify(noteFile.file, mdContent);
@@ -414,6 +443,7 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 			.setName('Sync type:')
 			.addDropdown(dropdown => dropdown
 				.addOption('one-way', 'One-way sync (FN ⇒ Obsidian)')
+				.addOption('one-way-delete', 'One-way sync (FN ⇒ Obsidian) + Delete from FN')
 				.addOption('two-way', 'Two-way sync (FN ⇔ Obsidian)')
 				.setValue(this.plugin.settings.sync_type)
 				.onChange(async (value) => {
