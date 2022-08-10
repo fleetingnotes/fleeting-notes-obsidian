@@ -23,7 +23,7 @@ interface ObsidianNote {
 
 const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	fleeting_notes_folder: '/',
-	note_template: '---\n# Metadata used for sync\nid: "${id}"\ntitle: "${title}"\ncreated: "${datetime}"\nsource: "${source}"\ndeleted: false\n---\n${content}',
+	note_template: '---\n# Metadata used for sync\nid: "${id}"\ntitle: "${title}"\ncreated: "${datetime}"\nsource: "${source}"\n---\n${content}',
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
 	sync_type: 'one-way',
@@ -331,7 +331,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				try {
 					var noteFile = existingNoteMap.get(note._id) || null;
-					const delete_note = this.settings.sync_type === 'one-way-delete' || noteFile.frontmatter.deleted === true;
+					const delete_note = this.settings.sync_type === 'one-way-delete' || noteFile?.frontmatter.deleted === true;
 					var mdContent = this.getFilledTemplate(this.settings.note_template, note, delete_note);
 					if (noteFile != null) {
 						// modify file if id exists in frontmatter
