@@ -223,7 +223,7 @@ export default class FleetingNotesPlugin extends Plugin {
 	}
 
 	// fills the template with the note data
-	getFilledTemplate(template: string, note: Note, is_deleted: boolean) {
+	getFilledTemplate(template: string, note: Note, add_deleted: boolean) {
 		const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
 		if (metadataMatch) {
 			const escapedTitle = note.title.replace(/\"/g, '\\"');
@@ -233,7 +233,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				.replace(/\$\{title\}/gm, escapedTitle)
 				.replace(/\$\{content\}/gm, escapedContent)
 				.replace(/\$\{source\}/gm, escapedSource);
-			if (is_deleted) {
+			if (add_deleted) {
 				const deleted_match = newMetadata.match(/^deleted:.*$/);
 				if (deleted_match) {
 					newMetadata = newMetadata.replace(deleted_match[0], 'deleted: true');
@@ -331,8 +331,8 @@ export default class FleetingNotesPlugin extends Plugin {
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				try {
 					var noteFile = existingNoteMap.get(note._id) || null;
-					const delete_note = this.settings.sync_type === 'one-way-delete' || noteFile?.frontmatter.deleted === true;
-					var mdContent = this.getFilledTemplate(this.settings.note_template, note, delete_note);
+					const add_deleted = this.settings.sync_type === 'one-way-delete';
+					var mdContent = this.getFilledTemplate(this.settings.note_template, note, add_deleted);
 					if (noteFile != null) {
 						// modify file if id exists in frontmatter
 						await this.app.vault.modify(noteFile.file, mdContent);
