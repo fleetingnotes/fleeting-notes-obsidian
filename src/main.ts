@@ -354,6 +354,22 @@ export default class FleetingNotesPlugin extends Plugin {
 			throwError(e, 'Failed to write notes to Obsidian');
 		}
 	}
+
+	getAllLinks() {
+		const unresolvedLinks = this.app.metadataCache.unresolvedLinks;
+		const resolvedLinks = this.app.metadataCache.resolvedLinks;
+		const allLinksSet = new Set();
+		for (const [file, links] of Object.entries(resolvedLinks)) {
+			const addLinkToSet = (link: string) => {
+				const cleanedLink = link.split('/').at(-1).replace(/\.md$/, '');
+				allLinksSet.add(cleanedLink);
+			}
+			addLinkToSet(file);
+			Object.keys(links).forEach(addLinkToSet);
+			Object.keys(unresolvedLinks[file]).forEach(addLinkToSet);
+		}
+		return [...allLinksSet];
+	}
 }
 
 class FleetingNotesSettingTab extends PluginSettingTab {
@@ -490,6 +506,20 @@ class FleetingNotesSettingTab extends PluginSettingTab {
 					});
 				
 			})
+			
+		new Setting(containerEl)
+			.setName('Copy Links to Clipboard')
+			.setDesc('Copy all Obsidian links to your clipboard')
+			.addButton(button => {
+				button
+					.setTooltip('Copy links to clipboard')
+					.setIcon("copy")
+					.onClick(() => {
+						const allLinks = this.plugin.getAllLinks();
+						const allLinksStr = allLinks.map(link => `[[${link}]]`).join(" ");
+						navigator.clipboard.writeText(allLinksStr);
+					});
+			});
 	}
 }
 
