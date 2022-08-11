@@ -356,16 +356,18 @@ export default class FleetingNotesPlugin extends Plugin {
 	}
 
 	getAllLinks() {
-		const unresolvedLinks = Object.values(this.app.metadataCache.unresolvedLinks);
-		const resolvedLinks = Object.values(this.app.metadataCache.resolvedLinks);
-		const linksInFiles = unresolvedLinks.concat(resolvedLinks);
+		const unresolvedLinks = this.app.metadataCache.unresolvedLinks;
+		const resolvedLinks = this.app.metadataCache.resolvedLinks;
 		const allLinksSet = new Set();
-		linksInFiles.forEach((links) => {
-			Object.keys(links).forEach((link) => {
+		for (const [file, links] of Object.entries(resolvedLinks)) {
+			const addLinkToSet = (link: string) => {
 				const cleanedLink = link.split('/').at(-1).replace(/\.md$/, '');
 				allLinksSet.add(cleanedLink);
-			});
-		});
+			}
+			addLinkToSet(file);
+			Object.keys(links).forEach(addLinkToSet);
+			Object.keys(unresolvedLinks[file]).forEach(addLinkToSet);
+		}
 		return [...allLinksSet];
 	}
 }
