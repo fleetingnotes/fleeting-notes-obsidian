@@ -1,11 +1,9 @@
+import { Notice, Plugin, TFile, parseYaml, MarkdownView } from "obsidian";
 import {
-	Notice,
-	Plugin,
-	TFile,
-	parseYaml,
-	MarkdownView,
-} from "obsidian";
-import { FleetingNotesSettings, FleetingNotesSettingsTab, DEFAULT_SETTINGS } from "./settings";
+	FleetingNotesSettings,
+	FleetingNotesSettingsTab,
+	DEFAULT_SETTINGS,
+} from "./settings";
 import {
 	getAllNotesFirebase,
 	pathJoin,
@@ -288,10 +286,9 @@ export default class FleetingNotesPlugin extends Plugin {
 		var newTemplate = template
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
-			.replace(/\$\{datetime\}/gm, note.timestamp.substring(0.1))
+			.replace(/\$\{datetime\}/gm, note.timestamp.substring(0, 10))
 			.replace(/\$\{content\}/gm, note.content)
 			.replace(/\$\{source\}/gm, note.source);
-
 		return newTemplate;
 	}
 
