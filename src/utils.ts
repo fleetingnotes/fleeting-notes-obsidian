@@ -1,5 +1,8 @@
 // helper functions
 // https://stackoverflow.com/a/29855282/13659833
+
+import { Note } from "./main";
+
 export function pathJoin(parts: Array<string>, sep: string = "/") {
 	var separator = sep || "/";
 	var replace = new RegExp(separator + "{1,}", "g");

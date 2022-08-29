@@ -20,7 +20,7 @@ interface ObsidianNote {
 	content: string;
 }
 
-interface Note {
+export interface Note {
 	_id: string;
 	title: string;
 	content: string;
@@ -28,6 +28,7 @@ interface Note {
 	source: string;
 	_isDeleted: boolean;
 }
+
 
 export default class FleetingNotesPlugin extends Plugin {
 	settings: FleetingNotesSettings;
