@@ -12,7 +12,6 @@ import {
 	throwError,
 	updateNotesFirebase,
 } from "./utils";
-var CryptoJS = require("crypto-js");
 
 interface ObsidianNote {
 	file: TFile;
