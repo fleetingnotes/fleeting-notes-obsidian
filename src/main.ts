@@ -10,7 +10,6 @@ import {
 	throwError,
 	updateNotesFirebase,
 } from "./utils";
-var CryptoJS = require("crypto-js");
 
 interface ObsidianNote {
 	file: TFile;
@@ -18,7 +17,7 @@ interface ObsidianNote {
 	content: string;
 }
 
-interface Note {
+export interface Note {
 	_id: string;
 	title: string;
 	content: string;

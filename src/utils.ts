@@ -1,3 +1,6 @@
+import { Note } from "./main";
+var CryptoJS = require("crypto-js");
+
 // helper functions
 // https://stackoverflow.com/a/29855282/13659833
 export function pathJoin(parts: Array<string>, sep: string = "/") {
