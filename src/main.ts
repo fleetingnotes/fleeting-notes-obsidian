@@ -22,6 +22,7 @@ export interface Note {
 	title: string;
 	content: string;
 	timestamp: string;
+	modified_timestamp: string;
 	source: string;
 	_isDeleted: boolean;
 }
@@ -285,7 +286,9 @@ export default class FleetingNotesPlugin extends Plugin {
 		var newTemplate = template
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
-			.replace(/\$\{datetime\}/gm, note.timestamp.substring(0, 10))
+			.replace(/\$\{datetime\}/gm, note.timestamp)
+			.replace(/\$\{created_date\}/gm, note.timestamp.substring(0, 10))
+			.replace(/\$\{last_modified_date\}/gm, note.modified_timestamp.substring(0, 10))
 			.replace(/\$\{content\}/gm, note.content)
 			.replace(/\$\{source\}/gm, note.source);
 		return newTemplate;
