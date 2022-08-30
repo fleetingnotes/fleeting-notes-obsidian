@@ -26,7 +26,7 @@
 		"typescript": "4.4.4"
 	},
 	"dependencies": {
-		"crypto-js": "^4.1.1",
-		"ts-jest": "^28.0.8"
+		"axios": "^0.27.2",
+		"crypto-js": "^4.1.1"
 	}
 }

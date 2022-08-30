@@ -1,10 +1,9 @@
+import axios from "axios";
 import { Note } from "./main";
 var CryptoJS = require("crypto-js");
 
 // helper functions
 // https://stackoverflow.com/a/29855282/13659833
-
-import { Note } from "./main";
 
 export function pathJoin(parts: Array<string>, sep: string = "/") {
 	var separator = sep || "/";
@@ -30,26 +29,30 @@ export const getAllNotesFirebase = async (
 	key: string
 ) => {
 	let notes: Note[] = [];
+	const base64Auth = btoa(`${email}:${password}`);
+	const url = `${firebaseUrl}/get_all_notes`;
 	try {
-		const base64Auth = btoa(`${email}:${password}`);
 		const config = {
-			method: "post",
-			url: `${firebaseUrl}/get_all_notes`,
-			contentType: "application/json",
 			headers: {
+				contentType: "application/json",
 				Authorization: `Basic ${base64Auth}`,
 				"hashed-encryption-key": key
 					? CryptoJS.SHA256(key).toString()
 					: undefined,
+				"Content-Type": "application/json",
 			},
 		};
-		const res = JSON.parse(await request(config));
+		console.log("config", config);
+		//params are url, data, config
+		const res = await axios.post(url, null, config).then((res) => res.data);
+		console.log("res", res);
 		if (res.error) {
 			throwError(Error(res.error), res.error);
 		}
 		notes = Array.from(res.map((note: any) => decryptNote(note, key)));
 		return notes;
 	} catch (e) {
+		console.log("error", e);
 		throwError(
 			e,
 			"Failed to get notes from Fleeting Notes - Check your credentials"
