@@ -1,11 +1,10 @@
+import { Notice, Plugin, TFile, parseYaml, MarkdownView } from "obsidian";
+import { InputModal } from "./inputModal";
 import {
-	Notice,
-	Plugin,
-	TFile,
-	parseYaml,
-	MarkdownView,
-} from "obsidian";
-import { FleetingNotesSettings, FleetingNotesSettingsTab, DEFAULT_SETTINGS } from "./settings";
+	FleetingNotesSettings,
+	FleetingNotesSettingsTab,
+	DEFAULT_SETTINGS,
+} from "./settings";
 import {
 	getAllNotesFirebase,
 	pathJoin,
@@ -47,6 +46,14 @@ export default class FleetingNotesPlugin extends Plugin {
 			name: "Insert Unprocessed Notes",
 			callback: async () => {
 				this.insertUnprocessedNotes();
+			},
+		});
+
+		this.addCommand({
+			id: "insert-same-source-notes",
+			name: "Insert All Notes With the Same Source",
+			callback: async () => {
+				this.insertSameSourceNotes();
 			},
 		});
 
@@ -108,6 +115,38 @@ export default class FleetingNotesPlugin extends Plugin {
 			} else {
 				console.error(e);
 				new Notice("Failed to insert unprocessed notes");
+			}
+		}
+	}
+
+	async insertSameSourceNotes() {
+		try {
+			let source: string;
+			new InputModal(this.app, "Enter Source", "Source", (result) => {
+				source = result;
+			}).open();
+
+			//i feel like this is a bad way to do this lmao
+			while (!source) {
+				await new Promise((r) => setTimeout(r, 100));
+			}
+			const sameSourceNotes = await this.getNotesWithSameSource(
+				this.settings.fleeting_notes_folder,
+				source
+			);
+			const template = "![[${linkText}]]\n\n";
+			const sameSourceNoteString = this.unprocessedNotesToString(
+				sameSourceNotes,
+				this.app.workspace.getActiveFile().path,
+				template
+			);
+			this.appendStringToActiveFile(sameSourceNoteString);
+		} catch (e) {
+			if (typeof e === "string") {
+				new Notice(e);
+			} else {
+				console.error(e);
+				new Notice("Failed to embed notes with same source");
 			}
 		}
 	}
@@ -309,20 +348,36 @@ export default class FleetingNotesPlugin extends Plugin {
 		return modifiedNotes;
 	}
 
-	unprocessedNotesToString(notes: Array<ObsidianNote>, sourcePath: string) {
+	unprocessedNotesToString(
+		notes: Array<ObsidianNote>,
+		sourcePath: string,
+	) {
 		let unprocessedNoteString = "";
-		const unprocessedNoteTemplate = "- [ ] ![[${linkText}]]\n";
+		const template = "- [ ] ![[${linkText}]]\n";
 		notes.forEach((note) => {
 			const linkText = this.app.metadataCache.fileToLinktext(
 				note.file,
 				sourcePath
 			);
-			unprocessedNoteString += unprocessedNoteTemplate.replace(
+			unprocessedNoteString += template.replace("${linkText}", linkText);
+		});
+		return unprocessedNoteString;
+	}
+	//![[linkText]]
+	embedNotesToString(notes: Array<ObsidianNote>, sourcePath: string) {
+		let embedNotesString = "";
+		const unprocessedNoteTemplate = "![[${linkText}]]\n";
+		notes.forEach((note) => {
+			const linkText = this.app.metadataCache.fileToLinktext(
+				note.file,
+				sourcePath
+			);
+			embedNotesString += unprocessedNoteTemplate.replace(
 				"${linkText}",
 				linkText
 			);
 		});
-		return unprocessedNoteString;
+		return embedNotesString;
 	}
 
 	async getUnprocessedFleetingNotes(folder: string) {
@@ -335,6 +390,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		existingNotes.forEach((note) =>
 			existingNotePathMap.set(note.file.path, note)
 		);
+
 		let skipNotesSet: Set<string> = new Set();
 
 		const resolvedLinks = this.app.metadataCache.resolvedLinks;
@@ -372,6 +428,40 @@ export default class FleetingNotesPlugin extends Plugin {
 			return !skipNotesSet.has(note.file.path);
 		});
 		return unprocessedNotes;
+	}
+
+	async getNotesWithSameSource(folder: string, source: string) {
+		folder = this.convertObsidianPath(folder);
+		let existingNotePathMap: Map<string, ObsidianNote> = new Map<
+			string,
+			ObsidianNote
+		>();
+		var existingNotes = await this.getExistingFleetingNotes(folder);
+		existingNotes.forEach((note) =>
+			existingNotePathMap.set(note.file.path, note)
+		);
+		const hasSourceInMetaData = (note: ObsidianNote) => {
+			let hasSource = false;
+			note.frontmatter
+				? Object.values(note.frontmatter).forEach(
+						(fm: string | number | boolean) => {
+							if (fm === source) {
+								hasSource = true;
+							}
+						}
+				  )
+				: null;
+			return hasSource;
+		};
+
+		const hasSourceInContent = (note: ObsidianNote) => {
+			return note.content?.includes(source);
+		};
+
+		const notesWithSameSource = existingNotes.filter((note) => {
+			return hasSourceInMetaData(note) || hasSourceInContent(note);
+		});
+		return notesWithSameSource;
 	}
 
 	// writes notes to obsidian
