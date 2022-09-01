@@ -53,7 +53,10 @@ export default class FleetingNotesPlugin extends Plugin {
 			id: "insert-same-source-notes",
 			name: "Insert All Notes With the Same Source",
 			callback: async () => {
-				this.insertSameSourceNotes();
+				this.openInputModal("Enter Source", "Source", (result) => {
+					console.log("result", result);
+					this.embedSameSourceNotes(result);
+				});
 			},
 		});
 
@@ -101,12 +104,14 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	async insertUnprocessedNotes() {
 		try {
+			const template = "- [ ] ![[${linkText}]]\n";
 			const unprocessedNotes = await this.getUnprocessedFleetingNotes(
 				this.settings.fleeting_notes_folder
 			);
-			const unprocessedNoteString = this.unprocessedNotesToString(
+			const unprocessedNoteString = this.embedNotesToString(
 				unprocessedNotes,
-				this.app.workspace.getActiveFile().path
+				this.app.workspace.getActiveFile().path,
+				template
 			);
 			this.appendStringToActiveFile(unprocessedNoteString);
 		} catch (e) {
@@ -119,28 +124,26 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 	}
 
-	async insertSameSourceNotes() {
+	async embedSameSourceNotes(source: string) {
+		let sameSourceNotes: ObsidianNote[] = [];
 		try {
-			let source: string;
-			new InputModal(this.app, "Enter Source", "Source", (result) => {
-				source = result;
-			}).open();
-
-			//i feel like this is a bad way to do this lmao
-			while (!source) {
-				await new Promise((r) => setTimeout(r, 100));
-			}
-			const sameSourceNotes = await this.getNotesWithSameSource(
+			sameSourceNotes = await this.getNotesWithSameSource(
 				this.settings.fleeting_notes_folder,
 				source
 			);
+			if (sameSourceNotes.length === 0) {
+				new Notice(`No notes with source ${source} found`);
+				return;
+			}
+			console.log("sameSourceNotes", sameSourceNotes);
 			const template = "![[${linkText}]]\n\n";
-			const sameSourceNoteString = this.unprocessedNotesToString(
+			const sameSourceNoteString = this.embedNotesToString(
 				sameSourceNotes,
 				this.app.workspace.getActiveFile().path,
 				template
 			);
 			this.appendStringToActiveFile(sameSourceNoteString);
+			new Notice(`Notes with source ${source} inserted`);
 		} catch (e) {
 			if (typeof e === "string") {
 				new Notice(e);
@@ -348,23 +351,11 @@ export default class FleetingNotesPlugin extends Plugin {
 		return modifiedNotes;
 	}
 
-	unprocessedNotesToString(
+	embedNotesToString(
 		notes: Array<ObsidianNote>,
 		sourcePath: string,
+		template: string
 	) {
-		let unprocessedNoteString = "";
-		const template = "- [ ] ![[${linkText}]]\n";
-		notes.forEach((note) => {
-			const linkText = this.app.metadataCache.fileToLinktext(
-				note.file,
-				sourcePath
-			);
-			unprocessedNoteString += template.replace("${linkText}", linkText);
-		});
-		return unprocessedNoteString;
-	}
-	//![[linkText]]
-	embedNotesToString(notes: Array<ObsidianNote>, sourcePath: string) {
 		let embedNotesString = "";
 		const unprocessedNoteTemplate = "![[${linkText}]]\n";
 		notes.forEach((note) => {
@@ -372,10 +363,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				note.file,
 				sourcePath
 			);
-			embedNotesString += unprocessedNoteTemplate.replace(
-				"${linkText}",
-				linkText
-			);
+			embedNotesString += template.replace("${linkText}", linkText);
 		});
 		return embedNotesString;
 	}
@@ -442,15 +430,15 @@ export default class FleetingNotesPlugin extends Plugin {
 		);
 		const hasSourceInMetaData = (note: ObsidianNote) => {
 			let hasSource = false;
-			note.frontmatter
-				? Object.values(note.frontmatter).forEach(
-						(fm: string | number | boolean) => {
-							if (fm === source) {
-								hasSource = true;
-							}
+			if (note.frontmatter) {
+				Object.values(note.frontmatter).forEach(
+					(fm: string | number | boolean) => {
+						if (fm === source) {
+							hasSource = true;
 						}
-				  )
-				: null;
+					}
+				);
+			}
 			return hasSource;
 		};
 
@@ -532,5 +520,9 @@ export default class FleetingNotesPlugin extends Plugin {
 			Object.keys(unresolvedLinks[file]).forEach(addLinkToSet);
 		}
 		return [...allLinksSet];
+	}
+
+	openInputModal(title: string, label: string, onSubmit: (result: any) => void) {
+		new InputModal(this.app, title, label, onSubmit).open();
 	}
 }
