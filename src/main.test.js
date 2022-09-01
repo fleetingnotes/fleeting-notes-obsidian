@@ -1,38 +1,34 @@
-var axios = require('axios');
-
-//intercept axios calls
-jest.mock("axios");
+const utils = require('./utils');
 
 function sum(a, b) {
 	return a + b;
 }
-const data = [
-	{
-		userId: 1,
-		id: 1,
-		title: "My First Album",
-	},
-	{
-		userId: 1,
-		id: 2,
-		title: "Album: The Sequel",
-	},
-];
 
-//override specific method
-axios.get.mockResolvedValue({
-	data: data,
-});
 
-axios.post.mockResolvedValue({
-	data: data,
-});
-
-test('get response from google', async () => {
-	const response = await axios.get('https://google.com');
-	expect(response.data).toEqual(data);
-});
+// Somewhere in your test case or test suite
+utils.getAllNotesFromFirebase = jest.fn().mockReturnValue({ notes: [note] });
 
 test("adds 1 + 2 to equal 3", () => {
 	expect(sum(1, 2)).toBe(3);
 });
+
+// create a test that fake gets from function and compares it with note
+describe("getNotes", () => {
+	it("should return notes", () => {
+		expect(utils.getAllNotesFromFirebase()).toBe([note]);
+	});
+});
+
+
+
+
+const note = {
+	_id: '1',
+	title: 'title',
+	content: 'content',
+	timestamp: '2022-08-03',
+	source: 'https://www.google.com',
+	_isDeleted: false,
+}
+
+
