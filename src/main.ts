@@ -5,6 +5,7 @@ import {
 	FleetingNotesSettingsTab,
 	DEFAULT_SETTINGS,
 } from "./settings";
+
 import {
 	getAllNotesFirebase,
 	pathJoin,
@@ -48,7 +49,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				this.insertUnprocessedNotes();
 			},
 		});
-
+   
 		this.addCommand({
 			id: "insert-same-source-notes",
 			name: "Insert All Notes With the Same Source",
@@ -521,8 +522,9 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 		return [...allLinksSet];
 	}
-
+  
 	openInputModal(title: string, label: string, onSubmit: (result: any) => void) {
 		new InputModal(this.app, title, label, onSubmit).open();
 	}
+
 }
