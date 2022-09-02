@@ -51,12 +51,11 @@ export default class FleetingNotesPlugin extends Plugin {
 		});
    
 		this.addCommand({
-			id: "insert-same-source-notes",
-			name: "Insert All Notes With the Same Source",
+			id: "insert-notes-containing",
+			name: "Insert All Notes Containing",
 			callback: async () => {
-				this.openInputModal("Enter Source", "Source", (result) => {
-					console.log("result", result);
-					this.embedSameSourceNotes(result);
+				this.openInputModal("Insert All Notes Containing:", "Text", (result) => {
+					this.embedNotesWithText(result);
 				});
 			},
 		});
@@ -125,18 +124,17 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 	}
 
-	async embedSameSourceNotes(source: string) {
+	async embedNotesWithText(text: string) {
 		let sameSourceNotes: ObsidianNote[] = [];
 		try {
-			sameSourceNotes = await this.getNotesWithSameSource(
+			sameSourceNotes = await this.getNotesWithText(
 				this.settings.fleeting_notes_folder,
-				source
+				text
 			);
 			if (sameSourceNotes.length === 0) {
-				new Notice(`No notes with source ${source} found`);
+				new Notice(`No notes with text "${text}" found`);
 				return;
 			}
-			console.log("sameSourceNotes", sameSourceNotes);
 			const template = "![[${linkText}]]\n\n";
 			const sameSourceNoteString = this.embedNotesToString(
 				sameSourceNotes,
@@ -144,13 +142,13 @@ export default class FleetingNotesPlugin extends Plugin {
 				template
 			);
 			this.appendStringToActiveFile(sameSourceNoteString);
-			new Notice(`Notes with source ${source} inserted`);
+			new Notice(`Notes with text "${text}" inserted`);
 		} catch (e) {
 			if (typeof e === "string") {
 				new Notice(e);
 			} else {
 				console.error(e);
-				new Notice("Failed to embed notes with same source");
+				new Notice(`Failed to embed notes with text: "${text}"`);
 			}
 		}
 	}
@@ -419,7 +417,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		return unprocessedNotes;
 	}
 
-	async getNotesWithSameSource(folder: string, source: string) {
+	async getNotesWithText(folder: string, text: string) {
 		folder = this.convertObsidianPath(folder);
 		let existingNotePathMap: Map<string, ObsidianNote> = new Map<
 			string,
@@ -429,12 +427,12 @@ export default class FleetingNotesPlugin extends Plugin {
 		existingNotes.forEach((note) =>
 			existingNotePathMap.set(note.file.path, note)
 		);
-		const hasSourceInMetaData = (note: ObsidianNote) => {
+		const textInMetaData = (note: ObsidianNote) => {
 			let hasSource = false;
 			if (note.frontmatter) {
 				Object.values(note.frontmatter).forEach(
 					(fm: string | number | boolean) => {
-						if (fm === source) {
+						if (fm.toString().includes(text)) {
 							hasSource = true;
 						}
 					}
@@ -443,12 +441,12 @@ export default class FleetingNotesPlugin extends Plugin {
 			return hasSource;
 		};
 
-		const hasSourceInContent = (note: ObsidianNote) => {
-			return note.content?.includes(source);
+		const hasTextInContent = (note: ObsidianNote) => {
+			return note.content?.includes(text);
 		};
 
 		const notesWithSameSource = existingNotes.filter((note) => {
-			return hasSourceInMetaData(note) || hasSourceInContent(note);
+			return textInMetaData(note) || hasTextInContent(note);
 		});
 		return notesWithSameSource;
 	}
