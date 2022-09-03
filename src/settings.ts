@@ -14,7 +14,7 @@ export interface FleetingNotesSettings {
 }
 
 export const DEFAULT_SETTINGS: FleetingNotesSettings = {
-	fleeting_notes_folder: "/",
+	fleeting_notes_folder: "FleetingNotesApp",
 	note_template:
 		'---\n# Metadata used for sync\nid: "${id}"\ntitle: "${title}"\ncreated: "${datetime}"\nsource: "${source}"\n---\n${content}',
 	sync_on_startup: false,
