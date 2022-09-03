@@ -11,6 +11,7 @@ export class InputModal extends Modal {
     this.title = title;
     this.inputLabel = inputLabel;
     this.onSubmit = onSubmit;
+    this.result = "";
   }
 
   onOpen() {
@@ -32,7 +33,9 @@ export class InputModal extends Modal {
           .setCta()
           .onClick(() => {
             this.close();
-            this.onSubmit(this.result);
+            if (this.result.length > 0) {
+              this.onSubmit(this.result);
+            }
           }));
   }
 
