@@ -1,4 +1,5 @@
-import { Notice, Plugin, TFile, parseYaml, MarkdownView } from "obsidian";
+// import moment
+import { moment, Notice, Plugin, TFile, parseYaml, MarkdownView } from "obsidian";
 import { InputModal } from "./inputModal";
 import {
 	FleetingNotesSettings,
@@ -332,8 +333,8 @@ export default class FleetingNotesPlugin extends Plugin {
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
 			.replace(/\$\{datetime\}/gm, note.timestamp)
-			.replace(/\$\{created_date\}/gm, note.timestamp.substring(0, 10))
-			.replace(/\$\{last_modified_date\}/gm, note.modified_timestamp.substring(0, 10))
+			.replace(/\$\{created_date\}/gm, moment(note.timestamp).local().format('YYYY-MM-DD'))
+			.replace(/\$\{last_modified_date\}/gm, moment(note.modified_timestamp).local().format('YYYY-MM-DD'))
 			.replace(/\$\{content\}/gm, note.content)
 			.replace(/\$\{source\}/gm, note.source);
 		return newTemplate;
