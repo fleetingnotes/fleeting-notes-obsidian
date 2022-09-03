@@ -52,7 +52,7 @@ export default class FleetingNotesPlugin extends Plugin {
    
 		this.addCommand({
 			id: "insert-notes-containing",
-			name: "Insert All Notes Containing",
+			name: "Insert All Notes Containing Specific Text",
 			callback: async () => {
 				this.openInputModal("Insert All Notes Containing:", "Text", (result) => {
 					this.embedNotesWithText(result);
