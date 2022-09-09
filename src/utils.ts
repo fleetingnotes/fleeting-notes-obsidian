@@ -1,3 +1,4 @@
+import { request } from "obsidian";
 import { Note } from "./main";
 var CryptoJS = require("crypto-js");
 
