@@ -25,7 +25,8 @@ const firebaseUrl =
 export const getAllNotesFirebase = async (
 	email: string,
 	password: string,
-	key: string
+	key: string,
+	filterKey: string
 ) => {
 	let notes: Note[] = [];
 	try {
@@ -46,6 +47,11 @@ export const getAllNotesFirebase = async (
 			throwError(Error(res.error), res.error);
 		}
 		notes = Array.from(res.map((note: any) => decryptNote(note, key)));
+		if (filterKey) {
+			notes = notes.filter((note) =>
+				note.title.includes(filterKey) || note.content.includes(filterKey)
+			);
+		}
 		return notes;
 	} catch (e) {
 		throwError(

@@ -5,6 +5,7 @@ export interface FleetingNotesSettings {
 	fleeting_notes_folder: string;
 	note_template: string;
 	sync_type: string;
+	notes_filter: string;
 	sync_on_startup: boolean;
 	last_sync_time: Date;
 	username: string;
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
 	sync_type: "one-way",
+	notes_filter: "",
 	username: "",
 	password: "",
 	encryption_key: "",
@@ -92,6 +94,19 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.fleeting_notes_folder)
 					.onChange(async (value) => {
 						this.plugin.settings.fleeting_notes_folder = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Notes filter text")
+			.setDesc("Notes will only be imported if the title/content includes the text")
+			.addText((text) =>
+				text
+					.setPlaceholder("ex. #work")
+					.setValue(this.plugin.settings.notes_filter)
+					.onChange(async (value) => {
+						this.plugin.settings.notes_filter = value;
 						await this.plugin.saveSettings();
 					})
 			);

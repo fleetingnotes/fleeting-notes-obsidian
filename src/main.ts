@@ -165,7 +165,8 @@ export default class FleetingNotesPlugin extends Plugin {
 			let notes = await getAllNotesFirebase(
 				this.settings.username,
 				this.settings.password,
-				this.settings.encryption_key
+				this.settings.encryption_key,
+				this.settings.notes_filter,
 			);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
