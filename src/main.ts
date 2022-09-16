@@ -1,11 +1,12 @@
+// import moment
+import { moment, Notice, Plugin, TFile, parseYaml, MarkdownView } from "obsidian";
+import { InputModal } from "./inputModal";
 import {
-	Notice,
-	Plugin,
-	TFile,
-	parseYaml,
-	MarkdownView,
-} from "obsidian";
-import { FleetingNotesSettings, FleetingNotesSettingsTab, DEFAULT_SETTINGS } from "./settings";
+	FleetingNotesSettings,
+	FleetingNotesSettingsTab,
+	DEFAULT_SETTINGS,
+} from "./settings";
+
 import {
 	getAllNotesFirebase,
 	pathJoin,
@@ -24,6 +25,7 @@ export interface Note {
 	title: string;
 	content: string;
 	timestamp: string;
+	modified_timestamp: string;
 	source: string;
 	_isDeleted: boolean;
 }
@@ -48,6 +50,16 @@ export default class FleetingNotesPlugin extends Plugin {
 			name: "Insert Unprocessed Notes",
 			callback: async () => {
 				this.insertUnprocessedNotes();
+			},
+		});
+   
+		this.addCommand({
+			id: "insert-notes-containing",
+			name: "Insert All Notes Containing Specific Text",
+			callback: async () => {
+				this.openInputModal("Insert All Notes Containing:", "Text", (result) => {
+					this.embedNotesWithText(result);
+				});
 			},
 		});
 
@@ -95,12 +107,14 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	async insertUnprocessedNotes() {
 		try {
+			const template = "- [ ] ![[${linkText}]]\n";
 			const unprocessedNotes = await this.getUnprocessedFleetingNotes(
 				this.settings.fleeting_notes_folder
 			);
-			const unprocessedNoteString = this.unprocessedNotesToString(
+			const unprocessedNoteString = this.embedNotesToString(
 				unprocessedNotes,
-				this.app.workspace.getActiveFile().path
+				this.app.workspace.getActiveFile().path,
+				template
 			);
 			this.appendStringToActiveFile(unprocessedNoteString);
 		} catch (e) {
@@ -109,6 +123,35 @@ export default class FleetingNotesPlugin extends Plugin {
 			} else {
 				console.error(e);
 				new Notice("Failed to insert unprocessed notes");
+			}
+		}
+	}
+
+	async embedNotesWithText(text: string) {
+		let sameSourceNotes: ObsidianNote[] = [];
+		try {
+			sameSourceNotes = await this.getNotesWithText(
+				this.settings.fleeting_notes_folder,
+				text
+			);
+			if (sameSourceNotes.length === 0) {
+				new Notice(`No notes with text "${text}" found`);
+				return;
+			}
+			const template = "![[${linkText}]]\n\n";
+			const sameSourceNoteString = this.embedNotesToString(
+				sameSourceNotes,
+				this.app.workspace.getActiveFile().path,
+				template
+			);
+			this.appendStringToActiveFile(sameSourceNoteString);
+			new Notice(`Notes with text "${text}" inserted`);
+		} catch (e) {
+			if (typeof e === "string") {
+				new Notice(e);
+			} else {
+				console.error(e);
+				new Notice(`Failed to embed notes with text: "${text}"`);
 			}
 		}
 	}
@@ -123,7 +166,8 @@ export default class FleetingNotesPlugin extends Plugin {
 			let notes = await getAllNotesFirebase(
 				this.settings.username,
 				this.settings.password,
-				this.settings.encryption_key
+				this.settings.encryption_key,
+				this.settings.notes_filter,
 			);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
@@ -288,10 +332,11 @@ export default class FleetingNotesPlugin extends Plugin {
 		var newTemplate = template
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
-			.replace(/\$\{datetime\}/gm, note.timestamp.substring(0.1))
+			.replace(/\$\{datetime\}/gm, note.timestamp)
+			.replace(/\$\{created_date\}/gm, moment(note.timestamp).local().format('YYYY-MM-DD'))
+			.replace(/\$\{last_modified_date\}/gm, moment(note.modified_timestamp).local().format('YYYY-MM-DD'))
 			.replace(/\$\{content\}/gm, note.content)
 			.replace(/\$\{source\}/gm, note.source);
-
 		return newTemplate;
 	}
 
@@ -310,20 +355,20 @@ export default class FleetingNotesPlugin extends Plugin {
 		return modifiedNotes;
 	}
 
-	unprocessedNotesToString(notes: Array<ObsidianNote>, sourcePath: string) {
-		let unprocessedNoteString = "";
-		const unprocessedNoteTemplate = "- [ ] ![[${linkText}]]\n";
+	embedNotesToString(
+		notes: Array<ObsidianNote>,
+		sourcePath: string,
+		template: string
+	) {
+		let embedNotesString = "";
 		notes.forEach((note) => {
 			const linkText = this.app.metadataCache.fileToLinktext(
 				note.file,
-				sourcePath
+				sourcePath,
 			);
-			unprocessedNoteString += unprocessedNoteTemplate.replace(
-				"${linkText}",
-				linkText
-			);
+			embedNotesString += template.replace("${linkText}", linkText);
 		});
-		return unprocessedNoteString;
+		return embedNotesString;
 	}
 
 	async getUnprocessedFleetingNotes(folder: string) {
@@ -336,6 +381,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		existingNotes.forEach((note) =>
 			existingNotePathMap.set(note.file.path, note)
 		);
+
 		let skipNotesSet: Set<string> = new Set();
 
 		const resolvedLinks = this.app.metadataCache.resolvedLinks;
@@ -373,6 +419,40 @@ export default class FleetingNotesPlugin extends Plugin {
 			return !skipNotesSet.has(note.file.path);
 		});
 		return unprocessedNotes;
+	}
+
+	async getNotesWithText(folder: string, text: string) {
+		folder = this.convertObsidianPath(folder);
+		let existingNotePathMap: Map<string, ObsidianNote> = new Map<
+			string,
+			ObsidianNote
+		>();
+		var existingNotes = await this.getExistingFleetingNotes(folder);
+		existingNotes.forEach((note) =>
+			existingNotePathMap.set(note.file.path, note)
+		);
+		const textInMetaData = (note: ObsidianNote) => {
+			let hasSource = false;
+			if (note.frontmatter) {
+				Object.values(note.frontmatter).forEach(
+					(fm: string | number | boolean) => {
+						if (fm.toString().includes(text)) {
+							hasSource = true;
+						}
+					}
+				);
+			}
+			return hasSource;
+		};
+
+		const hasTextInContent = (note: ObsidianNote) => {
+			return note.content?.includes(text);
+		};
+
+		const notesWithSameSource = existingNotes.filter((note) => {
+			return textInMetaData(note) || hasTextInContent(note);
+		});
+		return notesWithSameSource;
 	}
 
 	// writes notes to obsidian
@@ -444,4 +524,9 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 		return [...allLinksSet];
 	}
+  
+	openInputModal(title: string, label: string, onSubmit: (result: any) => void) {
+		new InputModal(this.app, title, label, onSubmit).open();
+	}
+
 }
