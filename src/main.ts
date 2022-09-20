@@ -40,7 +40,8 @@ export default class FleetingNotesPlugin extends Plugin {
 			id: "sync-fleeting-notes",
 			name: "Sync Notes with Fleeting Notes",
 			callback: async () => {
-				this.syncFleetingNotes();
+				await this.syncFleetingNotes();
+				new Notice("Fleeting Notes sync success!");
 			},
 		});
 
