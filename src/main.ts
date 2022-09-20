@@ -174,8 +174,6 @@ export default class FleetingNotesPlugin extends Plugin {
 				await this.deleteFleetingNotes(notes);
 			}
 			this.settings.last_sync_time = new Date();
-
-			new Notice("Fleeting Notes sync success!");
 		} catch (e) {
 			if (typeof e === "string") {
 				new Notice(e);
