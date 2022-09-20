@@ -1,5 +1,12 @@
 // import moment
-import { moment, Notice, Plugin, TFile, parseYaml, MarkdownView } from "obsidian";
+import {
+	moment,
+	Notice,
+	Plugin,
+	TFile,
+	parseYaml,
+	MarkdownView,
+} from "obsidian";
 import { InputModal } from "./inputModal";
 import {
 	FleetingNotesSettings,
@@ -51,14 +58,18 @@ export default class FleetingNotesPlugin extends Plugin {
 				this.insertUnprocessedNotes();
 			},
 		});
-   
+
 		this.addCommand({
 			id: "insert-notes-containing",
 			name: "Insert All Notes Containing Specific Text",
 			callback: async () => {
-				this.openInputModal("Insert All Notes Containing:", "Text", (result) => {
-					this.embedNotesWithText(result);
-				});
+				this.openInputModal(
+					"Insert All Notes Containing:",
+					"Text",
+					(result) => {
+						this.embedNotesWithText(result);
+					}
+				);
 			},
 		});
 
@@ -166,7 +177,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				this.settings.username,
 				this.settings.password,
 				this.settings.encryption_key,
-				this.settings.notes_filter,
+				this.settings.notes_filter
 			);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
@@ -332,8 +343,14 @@ export default class FleetingNotesPlugin extends Plugin {
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
 			.replace(/\$\{datetime\}/gm, note.timestamp)
-			.replace(/\$\{created_date\}/gm, moment(note.timestamp).local().format('YYYY-MM-DD'))
-			.replace(/\$\{last_modified_date\}/gm, moment(note.modified_timestamp).local().format('YYYY-MM-DD'))
+			.replace(
+				/\$\{created_date\}/gm,
+				moment(note.timestamp).local().format("YYYY-MM-DD")
+			)
+			.replace(
+				/\$\{last_modified_date\}/gm,
+				moment(note.modified_timestamp).local().format("YYYY-MM-DD")
+			)
 			.replace(/\$\{content\}/gm, note.content)
 			.replace(/\$\{source\}/gm, note.source);
 		return newTemplate;
@@ -363,7 +380,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		notes.forEach((note) => {
 			const linkText = this.app.metadataCache.fileToLinktext(
 				note.file,
-				sourcePath,
+				sourcePath
 			);
 			embedNotesString += template.replace("${linkText}", linkText);
 		});
@@ -461,19 +478,83 @@ export default class FleetingNotesPlugin extends Plugin {
 			string,
 			ObsidianNote
 		>();
+
+		let existingTitles: string[] = [];
 		try {
 			var existingNotes = await this.getExistingFleetingNotes(folder);
-			existingNotes.forEach((note) =>
-				existingNoteMap.set(note.frontmatter.id, note)
-			);
+			existingNotes.forEach((note) => {
+				existingNoteMap.set(note.frontmatter.id, note);
+				existingTitles.push(note.file.name);
+			});
 			var folderExists = await this.app.vault.adapter.exists(folder);
 			if (!folderExists) {
 				await this.app.vault.createFolder(folder);
 			}
 			for (var i = 0; i < notes.length; i++) {
 				var note = notes[i];
-				var title = note.title ? `${note.title}.md` : `${note._id}.md`;
+				//check if auto_generate_title is true
+				const getDefaultNoteTitle = (note: Note) => {
+					if (!this.settings.auto_generate_title) {
+						return `${note._id}.md`;
+					}
+					// get the first 60 characters of the note
+					let title = note.content.substring(0, 40);
+					let cutByNewLine = false;
+					if (
+						note.content.indexOf("\n") > 0 &&
+						note.content.indexOf("\n") < 40
+					) {
+						title = note.content.substring(
+							0,
+							note.content.indexOf("\n")
+						);
+						cutByNewLine = true;
+					}
+					title.replace(/([*'/\\<>?|])/g, "");
+					console.log("title", title);
+
+					//cut to nearest space
+					// if (
+					// 	(cutByNewLine &&
+					// 		title.length < note.content.length &&
+					// 		note.content.charAt(title.length) != " ")
+					// ) {
+					// 	title += "...";
+					// }
+
+					// check if note already exists
+					console.log(
+						"existingTitles",
+						existingTitles,
+						title,
+						existingTitles.includes(title)
+					);
+					if (!existingTitles.includes(title)) {
+						console.log("title does not exist, adding", title);
+						const replacedString = title.replace(/([*'/\\<>:?|])/g, "");
+						return `${replacedString}.md`;
+					}
+					let counter = 1;
+					while (existingTitles.includes(title + ` (${counter})`)) {
+						counter++;
+						console.log(
+							"title would be duplicate, adding counter to",
+							title + ` (${counter})`
+						);
+					}
+					const newTitle = title + ` (${counter})`;
+					console.log("final title", newTitle);
+					existingTitles.push(newTitle);
+					return `${newTitle}.md`;
+				};
+
+				var title = note.title
+					? `${note.title}.md`
+					: getDefaultNoteTitle(note);
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
+				if (!path.includes(".md")) {
+					path = path + ".md";
+				}
 				try {
 					var noteFile = existingNoteMap.get(note._id) || null;
 					const add_deleted =
@@ -523,9 +604,12 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 		return [...allLinksSet];
 	}
-  
-	openInputModal(title: string, label: string, onSubmit: (result: any) => void) {
+
+	openInputModal(
+		title: string,
+		label: string,
+		onSubmit: (result: any) => void
+	) {
 		new InputModal(this.app, title, label, onSubmit).open();
 	}
-
 }
