@@ -173,7 +173,7 @@ export const getDefaultNoteTitle = (
 
 	const counter = existingTitles.filter((existingTitle) => {
 		return title === existingTitle;
-	});
+	}).length;
 	const newTitle = title + ` (${counter})`;
 	existingTitles.push(title);
 	return `${newTitle}.md`;
