@@ -2,7 +2,7 @@ import { App, PluginSettingTab, Setting, TextAreaComponent } from "obsidian";
 import FleetingNotesPlugin from "./main";
 
 export interface FleetingNotesSettings {
-	auto_generate_title;
+	auto_generate_title: boolean;
 	fleeting_notes_folder: string;
 	note_template: string;
 	sync_type: string;
