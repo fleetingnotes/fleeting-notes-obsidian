@@ -19,6 +19,7 @@ import {
 	pathJoin,
 	throwError,
 	updateNotesFirebase,
+	getDefaultNoteTitle,
 } from "./utils";
 
 interface ObsidianNote {
@@ -492,65 +493,13 @@ export default class FleetingNotesPlugin extends Plugin {
 			}
 			for (var i = 0; i < notes.length; i++) {
 				var note = notes[i];
-				//check if auto_generate_title is true
-				const getDefaultNoteTitle = (note: Note) => {
-					if (!this.settings.auto_generate_title) {
-						return `${note._id}.md`;
-					}
-					// get the first 60 characters of the note
-					let title = note.content.substring(0, 40);
-					let cutByNewLine = false;
-					if (
-						note.content.indexOf("\n") > 0 &&
-						note.content.indexOf("\n") < 40
-					) {
-						title = note.content.substring(
-							0,
-							note.content.indexOf("\n")
-						);
-						cutByNewLine = true;
-					}
-					title.replace(/([*'/\\<>?|])/g, "");
-					console.log("title", title);
-
-					//cut to nearest space
-					// if (
-					// 	(cutByNewLine &&
-					// 		title.length < note.content.length &&
-					// 		note.content.charAt(title.length) != " ")
-					// ) {
-					// 	title += "...";
-					// }
-
-					// check if note already exists
-					console.log(
-						"existingTitles",
-						existingTitles,
-						title,
-						existingTitles.includes(title)
-					);
-					if (!existingTitles.includes(title)) {
-						console.log("title does not exist, adding", title);
-						const replacedString = title.replace(/([*'/\\<>:?|])/g, "");
-						return `${replacedString}.md`;
-					}
-					let counter = 1;
-					while (existingTitles.includes(title + ` (${counter})`)) {
-						counter++;
-						console.log(
-							"title would be duplicate, adding counter to",
-							title + ` (${counter})`
-						);
-					}
-					const newTitle = title + ` (${counter})`;
-					console.log("final title", newTitle);
-					existingTitles.push(newTitle);
-					return `${newTitle}.md`;
-				};
-
 				var title = note.title
 					? `${note.title}.md`
-					: getDefaultNoteTitle(note);
+					: getDefaultNoteTitle(
+							note,
+							existingTitles,
+							this.settings.auto_generate_title
+					  );
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				if (!path.includes(".md")) {
 					path = path + ".md";
