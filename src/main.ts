@@ -323,7 +323,7 @@ export default class FleetingNotesPlugin extends Plugin {
 			const [newContent, extractedTags] = extractAllTags(note.content);
 			content = newContent;
 			tags = extractedTags;
-		} 
+		}
 		if (metadataMatch) {
 			const escapedTitle = note.title.replace(/\"/g, '\\"');
 			const escapedContent = content.replace(/\"/g, '\\"');
@@ -364,7 +364,7 @@ export default class FleetingNotesPlugin extends Plugin {
 			)
 			.replace(/\$\{content\}/gm, content)
 			.replace(/\$\{source\}/gm, note.source);
-			
+
 		return newTemplate;
 	}
 

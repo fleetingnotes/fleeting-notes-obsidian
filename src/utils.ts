@@ -48,8 +48,10 @@ export const getAllNotesFirebase = async (
 		}
 		notes = Array.from(res.map((note: any) => decryptNote(note, key)));
 		if (filterKey) {
-			notes = notes.filter((note) =>
-				note.title.includes(filterKey) || note.content.includes(filterKey)
+			notes = notes.filter(
+				(note) =>
+					note.title.includes(filterKey) ||
+					note.content.includes(filterKey)
 			);
 		}
 		return notes;
@@ -156,4 +158,4 @@ export const extractAllTags = (text: string): [string, string[]] => {
 	}
 	text = text.replace(tagRegex, "");
 	return [text, tags];
-}
+};

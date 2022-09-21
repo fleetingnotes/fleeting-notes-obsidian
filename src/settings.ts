@@ -100,7 +100,9 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Notes filter text")
-			.setDesc("Notes will only be imported if the title/content includes the text")
+			.setDesc(
+				"Notes will only be imported if the title/content includes the text"
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder("ex. #work")
