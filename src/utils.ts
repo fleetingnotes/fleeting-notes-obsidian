@@ -144,3 +144,16 @@ export const encryptText = (text: string, key: string) => {
 	var ciphertext = CryptoJS.AES.encrypt(text, key).toString();
 	return ciphertext as string;
 };
+
+export const extractAllTags = (text: string): [string, string[]] => {
+	let tags = [];
+	let tagRegex = /(^|\B)#(?![0-9_]+\b)([a-zA-Z0-9_]{1,30})(\b|\r)/gm;
+	//get all tags, and when adding a tag, remove # and add quotation marks
+	let match = tagRegex.exec(text);
+	while (match != null) {
+		tags.push(`"${match[2]}"`);
+		match = tagRegex.exec(text);
+	}
+	text = text.replace(tagRegex, "");
+	return [text, tags];
+}

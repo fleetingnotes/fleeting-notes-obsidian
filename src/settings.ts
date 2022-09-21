@@ -17,7 +17,7 @@ export interface FleetingNotesSettings {
 export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	fleeting_notes_folder: "FleetingNotesApp",
 	note_template:
-		'---\n# Metadata used for sync\nid: "${id}"\ntitle: "${title}"\nsource: "${source}"\ncreated_date: "${created_date}"\nmodified_date: "${last_modified_date}"\n---\n${content}',
+		'---\n# Metadata used for sync\nid: "${id}"\ntitle: "${title}"\n# Extracts all tags in content into the metadata\ntags: ${tags}\nsource: "${source}"\ncreated_date: "${created_date}"\nmodified_date: "${last_modified_date}"\n---\n${content}',
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
 	sync_type: "one-way",

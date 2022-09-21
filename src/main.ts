@@ -1,5 +1,12 @@
 // import moment
-import { moment, Notice, Plugin, TFile, parseYaml, MarkdownView } from "obsidian";
+import {
+	moment,
+	Notice,
+	Plugin,
+	TFile,
+	parseYaml,
+	MarkdownView,
+} from "obsidian";
 import { InputModal } from "./inputModal";
 import {
 	FleetingNotesSettings,
@@ -8,6 +15,7 @@ import {
 } from "./settings";
 
 import {
+	extractAllTags,
 	getAllNotesFirebase,
 	pathJoin,
 	throwError,
@@ -51,14 +59,18 @@ export default class FleetingNotesPlugin extends Plugin {
 				this.insertUnprocessedNotes();
 			},
 		});
-   
+
 		this.addCommand({
 			id: "insert-notes-containing",
 			name: "Insert All Notes Containing Specific Text",
 			callback: async () => {
-				this.openInputModal("Insert All Notes Containing:", "Text", (result) => {
-					this.embedNotesWithText(result);
-				});
+				this.openInputModal(
+					"Insert All Notes Containing:",
+					"Text",
+					(result) => {
+						this.embedNotesWithText(result);
+					}
+				);
 			},
 		});
 
@@ -166,7 +178,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				this.settings.username,
 				this.settings.password,
 				this.settings.encryption_key,
-				this.settings.notes_filter,
+				this.settings.notes_filter
 			);
 			notes = notes.filter((note: Note) => !note._isDeleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
@@ -305,12 +317,21 @@ export default class FleetingNotesPlugin extends Plugin {
 	// fills the template with the note data
 	getFilledTemplate(template: string, note: Note, add_deleted: boolean) {
 		const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
+		let content = note.content;
+		let tags: string[] = [];
+		if (template.includes("${tags}")) {
+			const [newContent, extractedTags] = extractAllTags(note.content);
+			content = newContent;
+			tags = extractedTags;
+		} 
 		if (metadataMatch) {
 			const escapedTitle = note.title.replace(/\"/g, '\\"');
-			const escapedContent = note.content.replace(/\"/g, '\\"');
+			const escapedContent = content.replace(/\"/g, '\\"');
 			const escapedSource = note.source.replace(/\"/g, '\\"');
+			const escapedTags = `[${tags.join(", ")}]`;
 			var newMetadata = metadataMatch[1]
 				.replace(/\$\{title\}/gm, escapedTitle)
+				.replace(/\$\{tags\}/gm, escapedTags)
 				.replace(/\$\{content\}/gm, escapedContent)
 				.replace(/\$\{source\}/gm, escapedSource);
 			if (add_deleted) {
@@ -332,10 +353,18 @@ export default class FleetingNotesPlugin extends Plugin {
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
 			.replace(/\$\{datetime\}/gm, note.timestamp)
-			.replace(/\$\{created_date\}/gm, moment(note.timestamp).local().format('YYYY-MM-DD'))
-			.replace(/\$\{last_modified_date\}/gm, moment(note.modified_timestamp).local().format('YYYY-MM-DD'))
-			.replace(/\$\{content\}/gm, note.content)
+			.replace(/\$\{tags\}/gm, tags.join(", "))
+			.replace(
+				/\$\{created_date\}/gm,
+				moment(note.timestamp).local().format("YYYY-MM-DD")
+			)
+			.replace(
+				/\$\{last_modified_date\}/gm,
+				moment(note.modified_timestamp).local().format("YYYY-MM-DD")
+			)
+			.replace(/\$\{content\}/gm, content)
 			.replace(/\$\{source\}/gm, note.source);
+			
 		return newTemplate;
 	}
 
@@ -363,7 +392,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		notes.forEach((note) => {
 			const linkText = this.app.metadataCache.fileToLinktext(
 				note.file,
-				sourcePath,
+				sourcePath
 			);
 			embedNotesString += template.replace("${linkText}", linkText);
 		});
@@ -523,9 +552,12 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 		return [...allLinksSet];
 	}
-  
-	openInputModal(title: string, label: string, onSubmit: (result: any) => void) {
+
+	openInputModal(
+		title: string,
+		label: string,
+		onSubmit: (result: any) => void
+	) {
 		new InputModal(this.app, title, label, onSubmit).open();
 	}
-
 }
