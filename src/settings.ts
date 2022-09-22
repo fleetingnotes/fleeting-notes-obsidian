@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting, TextAreaComponent } from "obsidian";
 import FleetingNotesPlugin from "./main";
 
 export interface FleetingNotesSettings {
+	auto_generate_title: boolean;
 	fleeting_notes_folder: string;
 	note_template: string;
 	sync_type: string;
@@ -15,6 +16,7 @@ export interface FleetingNotesSettings {
 }
 
 export const DEFAULT_SETTINGS: FleetingNotesSettings = {
+	auto_generate_title: false,
 	fleeting_notes_folder: "FleetingNotesApp",
 	note_template:
 		'---\n# Metadata used for sync\nid: "${id}"\ntitle: "${title}"\nsource: "${source}"\ncreated_date: "${created_date}"\nmodified_date: "${last_modified_date}"\n---\n${content}',
@@ -100,7 +102,9 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Notes filter text")
-			.setDesc("Notes will only be imported if the title/content includes the text")
+			.setDesc(
+				"Notes will only be imported if the title/content includes the text"
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder("ex. #work")
@@ -189,6 +193,22 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 						this.display();
 					});
 			});
+
+		new Setting(containerEl)
+			.setName("Auto-generate note title")
+			.setDesc("Will generate based on note content")
+			.addToggle((tog) =>
+				tog
+					.setValue(this.plugin.settings.sync_on_startup)
+					.onChange(async (val) => {
+						this.plugin.settings.sync_on_startup = val;
+						val
+							? (this.plugin.settings.auto_generate_title = true)
+							: (this.plugin.settings.auto_generate_title =
+									false);
+						await this.plugin.saveSettings();
+					})
+			);
 
 		new Setting(containerEl)
 			.setName("Copy Links to Clipboard")

@@ -48,8 +48,10 @@ export const getAllNotesFirebase = async (
 		}
 		notes = Array.from(res.map((note: any) => decryptNote(note, key)));
 		if (filterKey) {
-			notes = notes.filter((note) =>
-				note.title.includes(filterKey) || note.content.includes(filterKey)
+			notes = notes.filter(
+				(note) =>
+					note.title.includes(filterKey) ||
+					note.content.includes(filterKey)
 			);
 		}
 		return notes;
@@ -143,4 +145,36 @@ export const decryptText = (text: string, key: string) => {
 export const encryptText = (text: string, key: string) => {
 	var ciphertext = CryptoJS.AES.encrypt(text, key).toString();
 	return ciphertext as string;
+};
+
+export const getDefaultNoteTitle = (
+	note: Note,
+	existingTitles: string[],
+	autoGenerateTitle: boolean
+) => {
+	if (!autoGenerateTitle) {
+		const newTitle = `${note._id}.md`;
+		existingTitles.push(newTitle);
+		return newTitle;
+	}
+
+	let title = note.content.substring(0, 40);
+	let cutByNewLine = false;
+	if (note.content.indexOf("\n") > 0 && note.content.indexOf("\n") < 40) {
+		title = note.content.substring(0, note.content.indexOf("\n"));
+		cutByNewLine = true;
+	}
+	title.replace(/([*'/\\<>?:|])/g, "");
+	if (!existingTitles.includes(title || `${title}.md`)) {
+		const newTitle = title.replace(/([*'/\\<>:?|])/g, "");
+		existingTitles.push(newTitle);
+		return `${newTitle}.md`;
+	}
+
+	const counter = existingTitles.filter((existingTitle) => {
+		return title === existingTitle;
+	}).length;
+	const newTitle = title + ` (${counter})`;
+	existingTitles.push(title);
+	return `${newTitle}.md`;
 };
