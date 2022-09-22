@@ -320,9 +320,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		let content = note.content;
 		let tags: string[] = [];
 		if (template.includes("${tags}")) {
-			const [newContent, extractedTags] = extractAllTags(note.content);
-			content = newContent;
-			tags = extractedTags;
+			tags = extractAllTags(note.content);
 		}
 		if (metadataMatch) {
 			const escapedTitle = note.title.replace(/\"/g, '\\"');
@@ -353,7 +351,7 @@ export default class FleetingNotesPlugin extends Plugin {
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
 			.replace(/\$\{datetime\}/gm, note.timestamp)
-			.replace(/\$\{tags\}/gm, tags.join(", "))
+			.replace(/\$\{tags\}/gm, `[${tags.join(", ")}]`)
 			.replace(
 				/\$\{created_date\}/gm,
 				moment(note.timestamp).local().format("YYYY-MM-DD")

@@ -147,15 +147,13 @@ export const encryptText = (text: string, key: string) => {
 	return ciphertext as string;
 };
 
-export const extractAllTags = (text: string): [string, string[]] => {
+export const extractAllTags = (text: string): string[] => {
 	let tags = [];
 	let tagRegex = /(^|\B)#(?![0-9_]+\b)([a-zA-Z0-9_]{1,30})(\b|\r)/gm;
-	//get all tags, and when adding a tag, remove # and add quotation marks
-	let match = tagRegex.exec(text);
-	while (match != null) {
+	//get all tags, and when adding a tag, remove # and add quotation marks, using matchall
+	let matches = text.matchAll(tagRegex);
+	for (const match of matches) {
 		tags.push(`"${match[2]}"`);
-		match = tagRegex.exec(text);
 	}
-	text = text.replace(tagRegex, "");
-	return [text, tags];
+	return tags;
 };
