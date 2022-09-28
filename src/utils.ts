@@ -157,3 +157,34 @@ export const extractAllTags = (text: string): string[] => {
 	}
 	return tags;
 };
+export const getDefaultNoteTitle = (
+	note: Note,
+	existingTitles: string[],
+	autoGenerateTitle: boolean
+) => {
+	if (!autoGenerateTitle) {
+		const newTitle = `${note._id}.md`;
+		existingTitles.push(newTitle);
+		return newTitle;
+	}
+
+	let title = note.content.substring(0, 40);
+	let cutByNewLine = false;
+	if (note.content.indexOf("\n") > 0 && note.content.indexOf("\n") < 40) {
+		title = note.content.substring(0, note.content.indexOf("\n"));
+		cutByNewLine = true;
+	}
+	title.replace(/([*'/\\<>?:|])/g, "");
+	if (!existingTitles.includes(title || `${title}.md`)) {
+		const newTitle = title.replace(/([*'/\\<>:?|])/g, "");
+		existingTitles.push(newTitle);
+		return `${newTitle}.md`;
+	}
+
+	const counter = existingTitles.filter((existingTitle) => {
+		return title === existingTitle;
+	}).length;
+	const newTitle = title + ` (${counter})`;
+	existingTitles.push(title);
+	return `${newTitle}.md`;
+};

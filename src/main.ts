@@ -20,6 +20,7 @@ import {
 	pathJoin,
 	throwError,
 	updateNotesFirebase,
+	getDefaultNoteTitle,
 } from "./utils";
 
 interface ObsidianNote {
@@ -48,7 +49,8 @@ export default class FleetingNotesPlugin extends Plugin {
 			id: "sync-fleeting-notes",
 			name: "Sync Notes with Fleeting Notes",
 			callback: async () => {
-				this.syncFleetingNotes();
+				await this.syncFleetingNotes();
+				new Notice("Fleeting Notes sync success!");
 			},
 		});
 
@@ -186,8 +188,6 @@ export default class FleetingNotesPlugin extends Plugin {
 				await this.deleteFleetingNotes(notes);
 			}
 			this.settings.last_sync_time = new Date();
-
-			new Notice("Fleeting Notes sync success!");
 		} catch (e) {
 			if (typeof e === "string") {
 				new Notice(e);
@@ -488,19 +488,31 @@ export default class FleetingNotesPlugin extends Plugin {
 			string,
 			ObsidianNote
 		>();
+
+		let existingTitles: string[] = [];
 		try {
 			var existingNotes = await this.getExistingFleetingNotes(folder);
-			existingNotes.forEach((note) =>
-				existingNoteMap.set(note.frontmatter.id, note)
-			);
+			existingNotes.forEach((note) => {
+				existingNoteMap.set(note.frontmatter.id, note);
+				existingTitles.push(note.file.name);
+			});
 			var folderExists = await this.app.vault.adapter.exists(folder);
 			if (!folderExists) {
 				await this.app.vault.createFolder(folder);
 			}
 			for (var i = 0; i < notes.length; i++) {
 				var note = notes[i];
-				var title = note.title ? `${note.title}.md` : `${note._id}.md`;
+				var title = note.title
+					? `${note.title}.md`
+					: getDefaultNoteTitle(
+							note,
+							existingTitles,
+							this.settings.auto_generate_title
+					  );
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
+				if (!path.includes(".md")) {
+					path = path + ".md";
+				}
 				try {
 					var noteFile = existingNoteMap.get(note._id) || null;
 					const add_deleted =
