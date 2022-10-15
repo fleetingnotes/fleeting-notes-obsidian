@@ -1,7 +1,7 @@
 {
 	"id": "fleeting-notes-obsidian",
 	"name": "Fleeting Notes Sync",
-	"version": "0.3.6",
+	"version": "0.3.7",
 	"minAppVersion": "0.12.0",
 	"description": "This is a plugin to sync Fleeting Notes with Obsidian",
 	"author": "Matthew Wong",
