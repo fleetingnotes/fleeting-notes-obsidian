@@ -15,6 +15,7 @@ import {
 } from "./settings";
 
 import {
+	extractAllTags,
 	getAllNotesFirebase,
 	pathJoin,
 	throwError,
@@ -316,12 +317,19 @@ export default class FleetingNotesPlugin extends Plugin {
 	// fills the template with the note data
 	getFilledTemplate(template: string, note: Note, add_deleted: boolean) {
 		const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
+		let content = note.content;
+		let tags: string[] = [];
+		if (template.includes("${tags}")) {
+			tags = extractAllTags(note.content);
+		}
 		if (metadataMatch) {
 			const escapedTitle = note.title.replace(/\"/g, '\\"');
-			const escapedContent = note.content.replace(/\"/g, '\\"');
+			const escapedContent = content.replace(/\"/g, '\\"');
 			const escapedSource = note.source.replace(/\"/g, '\\"');
+			const escapedTags = `[${tags.join(", ")}]`;
 			var newMetadata = metadataMatch[1]
 				.replace(/\$\{title\}/gm, escapedTitle)
+				.replace(/\$\{tags\}/gm, escapedTags)
 				.replace(/\$\{content\}/gm, escapedContent)
 				.replace(/\$\{source\}/gm, escapedSource);
 			if (add_deleted) {
@@ -343,6 +351,7 @@ export default class FleetingNotesPlugin extends Plugin {
 			.replace(/\$\{id\}/gm, note._id)
 			.replace(/\$\{title\}/gm, note.title)
 			.replace(/\$\{datetime\}/gm, note.timestamp)
+			.replace(/\$\{tags\}/gm, `[${tags.join(", ")}]`)
 			.replace(
 				/\$\{created_date\}/gm,
 				moment(note.timestamp).local().format("YYYY-MM-DD")
@@ -351,8 +360,9 @@ export default class FleetingNotesPlugin extends Plugin {
 				/\$\{last_modified_date\}/gm,
 				moment(note.modified_timestamp).local().format("YYYY-MM-DD")
 			)
-			.replace(/\$\{content\}/gm, note.content)
+			.replace(/\$\{content\}/gm, content)
 			.replace(/\$\{source\}/gm, note.source);
+
 		return newTemplate;
 	}
 
