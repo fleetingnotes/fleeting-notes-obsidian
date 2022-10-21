@@ -1,4 +1,4 @@
-import { updateNotesSupabase } from './utils';
+import { updateNotesSupabase } from "./utils";
 // import moment
 import {
 	moment,
@@ -381,7 +381,8 @@ export default class FleetingNotesPlugin extends Plugin {
 		var modifiedNotes = existingNotes.filter((note) => {
 			const { file, frontmatter } = note;
 			const isContentModified =
-				new Date(file.stat.mtime) > new Date(this.settings.last_sync_time);
+				new Date(file.stat.mtime) >
+				new Date(this.settings.last_sync_time);
 			const isTitleChanged =
 				frontmatter.title && frontmatter.title !== file.basename;
 			return isContentModified || isTitleChanged;
@@ -570,5 +571,4 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 		return [...allLinksSet];
 	}
-
 }

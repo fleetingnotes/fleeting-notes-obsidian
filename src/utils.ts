@@ -69,7 +69,10 @@ export const getAllNotesSupabase = async (
 
 	try {
 		if (!firebaseId) {
-			throwError("Fleeting Notes Sync Failed - Please Log In", "Fleeting Notes Sync Failed - Please Log In");
+			throwError(
+				"Fleeting Notes Sync Failed - Please Log In",
+				"Fleeting Notes Sync Failed - Please Log In"
+			);
 		}
 		await supabase
 			.from("notes")
