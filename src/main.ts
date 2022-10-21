@@ -1,3 +1,4 @@
+import { updateNotesSupabase } from './utils';
 // import moment
 import {
 	moment,
@@ -7,7 +8,6 @@ import {
 	parseYaml,
 	MarkdownView,
 } from "obsidian";
-import { InputModal } from "./inputModal";
 import {
 	FleetingNotesSettings,
 	FleetingNotesSettingsTab,
@@ -16,11 +16,12 @@ import {
 
 import {
 	extractAllTags,
-	getAllNotesFirebase,
+	getAllNotesSupabase,
 	pathJoin,
 	throwError,
-	updateNotesFirebase,
+	updateNotesSupabase,
 	getDefaultNoteTitle,
+	openInputModal,
 } from "./utils";
 
 interface ObsidianNote {
@@ -30,13 +31,13 @@ interface ObsidianNote {
 }
 
 export interface Note {
-	_id: string;
+	id: string;
 	title: string;
 	content: string;
-	timestamp: string;
-	modified_timestamp: string;
+	created_at: string;
+	modified_at: string;
 	source: string;
-	_isDeleted: boolean;
+	deleted: boolean;
 }
 
 export default class FleetingNotesPlugin extends Plugin {
@@ -50,7 +51,6 @@ export default class FleetingNotesPlugin extends Plugin {
 			name: "Sync Notes with Fleeting Notes",
 			callback: async () => {
 				await this.syncFleetingNotes();
-				new Notice("Fleeting Notes sync success!");
 			},
 		});
 
@@ -66,11 +66,17 @@ export default class FleetingNotesPlugin extends Plugin {
 			id: "insert-notes-containing",
 			name: "Insert All Notes Containing Specific Text",
 			callback: async () => {
-				this.openInputModal(
+				openInputModal(
 					"Insert All Notes Containing:",
-					"Text",
+					[
+						{
+							label: "Text",
+							value: "text",
+						},
+					],
+					"Search",
 					(result) => {
-						this.embedNotesWithText(result);
+						this.embedNotesWithText(result.text);
 					}
 				);
 			},
@@ -176,13 +182,12 @@ export default class FleetingNotesPlugin extends Plugin {
 				await this.pushFleetingNotes();
 			}
 			// pull fleeting notes
-			let notes = await getAllNotesFirebase(
-				this.settings.username,
-				this.settings.password,
+			let notes = await getAllNotesSupabase(
+				this.settings.userInfo,
 				this.settings.encryption_key,
 				this.settings.notes_filter
 			);
-			notes = notes.filter((note: Note) => !note._isDeleted);
+			notes = notes.filter((note: Note) => !note.deleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
 			if (this.settings.sync_type == "one-way-delete") {
 				await this.deleteFleetingNotes(notes);
@@ -235,18 +240,22 @@ export default class FleetingNotesPlugin extends Plugin {
 				modifiedNotes.map(async (note) => {
 					var { file, frontmatter, content } = note;
 					return {
-						_id: frontmatter.id,
+						id: frontmatter.id,
 						title: frontmatter.title ? file.basename : "",
 						content: content || "",
 						source: frontmatter.source || "",
-						_isDeleted: frontmatter.deleted || false,
+						deleted: frontmatter.deleted || false,
 					};
 				})
 			);
 			if (formattedNotes.length > 0) {
-				await updateNotesFirebase(
-					this.settings.username,
-					this.settings.password,
+				// await updateNotesFirebase(
+
+				// 	this.settings.encryption_key,
+				// 	formattedNotes
+				// );
+				await updateNotesSupabase(
+					this.settings.userInfo,
 					this.settings.encryption_key,
 					formattedNotes
 				);
@@ -265,15 +274,14 @@ export default class FleetingNotesPlugin extends Plugin {
 			var notesToDelete = await Promise.all(
 				notes.map(async (note) => {
 					return {
-						_id: note._id,
-						_isDeleted: true,
+						id: note.id,
+						deleted: true,
 					};
 				})
 			);
 			if (notesToDelete.length > 0) {
-				await updateNotesFirebase(
-					this.settings.username,
-					this.settings.password,
+				await updateNotesSupabase(
+					this.settings.userInfo,
 					this.settings.encryption_key,
 					notesToDelete
 				);
@@ -348,17 +356,17 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 
 		var newTemplate = template
-			.replace(/\$\{id\}/gm, note._id)
+			.replace(/\$\{id\}/gm, note.id)
 			.replace(/\$\{title\}/gm, note.title)
-			.replace(/\$\{datetime\}/gm, note.timestamp)
+			.replace(/\$\{datetime\}/gm, note.created_at)
 			.replace(/\$\{tags\}/gm, `[${tags.join(", ")}]`)
 			.replace(
 				/\$\{created_date\}/gm,
-				moment(note.timestamp).local().format("YYYY-MM-DD")
+				moment(note.created_at).local().format("YYYY-MM-DD")
 			)
 			.replace(
 				/\$\{last_modified_date\}/gm,
-				moment(note.modified_timestamp).local().format("YYYY-MM-DD")
+				moment(note.modified_at).local().format("YYYY-MM-DD")
 			)
 			.replace(/\$\{content\}/gm, content)
 			.replace(/\$\{source\}/gm, note.source);
@@ -373,7 +381,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		var modifiedNotes = existingNotes.filter((note) => {
 			const { file, frontmatter } = note;
 			const isContentModified =
-				new Date(file.stat.mtime) > this.settings.last_sync_time;
+				new Date(file.stat.mtime) > new Date(this.settings.last_sync_time);
 			const isTitleChanged =
 				frontmatter.title && frontmatter.title !== file.basename;
 			return isContentModified || isTitleChanged;
@@ -563,11 +571,4 @@ export default class FleetingNotesPlugin extends Plugin {
 		return [...allLinksSet];
 	}
 
-	openInputModal(
-		title: string,
-		label: string,
-		onSubmit: (result: any) => void
-	) {
-		new InputModal(this.app, title, label, onSubmit).open();
-	}
 }
