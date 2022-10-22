@@ -17,7 +17,8 @@ export interface FleetingNotesSettings {
 	notes_filter: string;
 	sync_on_startup: boolean;
 	last_sync_time: Date;
-	userInfo: any;
+	firebaseId: any;
+	supabaseId: any;
 	encryption_key: string;
 	sync_interval: NodeJS.Timer | undefined;
 }
@@ -31,7 +32,8 @@ export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	last_sync_time: new Date(0),
 	sync_type: "one-way",
 	notes_filter: "",
-	userInfo: undefined,
+	firebaseId: undefined,
+	supabaseId: undefined,
 	encryption_key: "",
 	sync_interval: undefined,
 };
@@ -44,8 +46,9 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 	}
 
 	async manageAccount(btn: any) {
-		if (this.plugin.settings.userInfo) {
-			this.plugin.settings.userInfo = undefined;
+		if (this.plugin.settings.firebaseId || this.plugin.settings.supabaseId) {
+			this.plugin.settings.firebaseId = undefined;
+			this.plugin.settings.supabaseId = undefined;
 			btn.setButtonText("Sign In").setCta();
 			return;
 		}
@@ -70,8 +73,9 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 				const supaSuccess =
 					supaRes === null || supaRes.error ? false : true;
 				if (supaSuccess) {
-					this.plugin.settings.userInfo =
+					this.plugin.settings.firebaseId =
 						supaRes.data.user.user_metadata.firebaseUid;
+					this.plugin.settings.supabaseId = supaRes.data.user.id;
 					btn.setButtonText("Sign Out").setCta();
 				} else {
 					new Notice(`Login failed - ${supaRes.error.message}`);
@@ -122,7 +126,7 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 			.addButton((btn: any) =>
 				btn
 					.setButtonText(
-						this.plugin.settings.userInfo ? "Sign Out" : "Sign In"
+						this.plugin.settings.supabaseId ? "Sign Out" : "Sign In"
 					)
 					.setCta()
 					.onClick(async () => await this.manageAccount(btn))

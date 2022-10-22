@@ -1,4 +1,3 @@
-import { updateNotesSupabase } from "./utils";
 // import moment
 import {
 	moment,
@@ -182,11 +181,12 @@ export default class FleetingNotesPlugin extends Plugin {
 				await this.pushFleetingNotes();
 			}
 			// pull fleeting notes
-			let notes = await getAllNotesSupabase(
-				this.settings.userInfo,
-				this.settings.encryption_key,
-				this.settings.notes_filter
-			);
+			let notes = await getAllNotesSupabase({
+				firebaseId: this.settings.firebaseId,
+				supabaseId: this.settings.supabaseId,
+				key: this.settings.encryption_key,
+				filterKey: this.settings.notes_filter,
+			});
 			notes = notes.filter((note: Note) => !note.deleted);
 			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
 			if (this.settings.sync_type == "one-way-delete") {
@@ -254,11 +254,10 @@ export default class FleetingNotesPlugin extends Plugin {
 				// 	this.settings.encryption_key,
 				// 	formattedNotes
 				// );
-				await updateNotesSupabase(
-					this.settings.userInfo,
-					this.settings.encryption_key,
-					formattedNotes
-				);
+				await updateNotesSupabase({
+					key: this.settings.encryption_key,
+					notes: formattedNotes,
+				});
 				this.settings.last_sync_time = new Date();
 			}
 		} catch (e) {
@@ -280,11 +279,10 @@ export default class FleetingNotesPlugin extends Plugin {
 				})
 			);
 			if (notesToDelete.length > 0) {
-				await updateNotesSupabase(
-					this.settings.userInfo,
-					this.settings.encryption_key,
-					notesToDelete
-				);
+				await updateNotesSupabase({
+					key: this.settings.encryption_key,
+					notes: notesToDelete,
+				});
 			}
 		} catch (e) {
 			throwError(e, "Failed to delete notes from Fleeting Notes");

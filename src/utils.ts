@@ -60,12 +60,19 @@ export const loginSupabase = async (
 	}
 };
 
-export const getAllNotesSupabase = async (
-	firebaseId: string,
-	key: string,
-	filterKey: string
-) => {
+export const getAllNotesSupabase = async ({
+	firebaseId,
+	supabaseId,
+	key,
+	filterKey,
+}: {
+	firebaseId: string;
+	supabaseId: string;
+	key: string;
+	filterKey: string;
+}) => {
 	let notes: Note[] = [];
+	console.log("getAllNotesSupabase", firebaseId, supabaseId, key, filterKey);
 
 	try {
 		if (!firebaseId) {
@@ -77,7 +84,7 @@ export const getAllNotesSupabase = async (
 		await supabase
 			.from("notes")
 			.select()
-			.filter("_partition", "eq", firebaseId)
+			.filter("_partition", "in", `(${firebaseId},${supabaseId})`)
 			.filter("deleted", "eq", false)
 			.then((res) => {
 				if (res.error) {
@@ -139,31 +146,44 @@ export const updateNotesFirebase = async (
 	}
 };
 
-export const updateNotesSupabase = async (
-	userInfo: string,
-	key: string,
-	notes: Array<any>
-) => {
+export const updateNotesSupabase = async ({
+	key,
+	notes,
+}: {
+	key: string;
+	notes: Array<any>;
+}) => {
+	console.log("notes", notes);
 	try {
 		var encryptedNotes = Array.from(
 			notes.map((note: any) => encryptNote(note, key))
 		);
-		encryptedNotes.forEach(async (note) => {
-			await supabase
-				.from("notes")
-				.update({
-					title: note.title,
-					content: note.content,
-					deleted: note.deleted,
-					source: note.source,
-				})
-				.eq("id", note.id)
-				.then((res) => {
-					if (res.error) {
-						throwError(res.error, res.error.message);
-					}
-				});
-		});
+		// encryptedNotes.forEach(async (note) => {
+		// 	await supabase
+		// 		.from("notes")
+		// 		.update({
+		// 			title: note.title,
+		// 			content: note.content,
+		// 			deleted: note.deleted,
+		// 			source: note.source,
+		// 		})
+		// 		.eq("id", note.id)
+		// 		.then((res) => {
+		// 			if (res.error) {
+		// 				throwError(res.error, res.error.message);
+		// 			}
+		// 		});
+		// });
+		await supabase
+			.from("notes")
+			.upsert(encryptedNotes, {
+				onConflict: "id",
+			})
+			.then((res) => {
+				if (res.error) {
+					throwError(res.error, res.error.message);
+				}
+			});
 	} catch (e) {
 		throwError(
 			e,
