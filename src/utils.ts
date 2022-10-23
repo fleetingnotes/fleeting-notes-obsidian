@@ -146,34 +146,94 @@ export const updateNotesFirebase = async (
 	}
 };
 
+interface SupabaseNote {
+	id: string;
+	title: string;
+	content: string;
+	source: string;
+	created_at: string;
+	modified_at: string;
+	deleted: boolean;
+	shared: boolean;
+	encrypted: boolean;
+	_partition: string;
+}
+
 export const updateNotesSupabase = async ({
+	firebaseId,
+	supabaseId,
 	key,
 	notes,
 }: {
+	firebaseId: string;
+	supabaseId: string;
 	key: string;
 	notes: Array<any>;
 }) => {
 	console.log("notes", notes);
 	try {
-		var encryptedNotes = Array.from(
+		let encryptedNotes = Array.from(
 			notes.map((note: any) => encryptNote(note, key))
 		);
-		// encryptedNotes.forEach(async (note) => {
-		// 	await supabase
-		// 		.from("notes")
-		// 		.update({
-		// 			title: note.title,
-		// 			content: note.content,
-		// 			deleted: note.deleted,
-		// 			source: note.source,
-		// 		})
-		// 		.eq("id", note.id)
-		// 		.then((res) => {
-		// 			if (res.error) {
-		// 				throwError(res.error, res.error.message);
-		// 			}
-		// 		});
-		// });
+		let supabaseNotes: SupabaseNote[] = [];
+		let noteIds = encryptedNotes.map((note) => note.id);
+		// get all fields of the note
+		await supabase
+			.from("notes")
+			.select()
+			.in("_partition", [firebaseId, supabaseId])
+			.eq("deleted", false)
+			.in("id", noteIds)
+			.then((res) => {
+				if (res.error) {
+					throwError(res.error, res.error.message);
+				}
+				supabaseNotes = res.data;
+
+				// needs to be updated if modified date of note is different from supabase modified_at date
+				// use timezoneOffset to make them both same time
+				encryptedNotes = encryptedNotes.filter((note) => {
+					let supabaseNote = res.data.find(
+						(supabaseNote: any) => supabaseNote.id === note.id
+					);
+					if (!supabaseNote) {
+						return false;
+					}
+
+					return (
+						new Date(supabaseNote?.modified_at) <
+						new Date(new Date(note.modified_at))
+					);
+				});
+
+				//merge possibly updated fields
+				encryptedNotes = encryptedNotes.map((note) => {
+					let supabaseNote = supabaseNotes?.find(
+						(supabaseNote: any) => supabaseNote.id === note.id
+					);
+					return {
+						...supabaseNote,
+						title: note.title,
+						content: note.content,
+						source: note.source,
+						modified_at: note.modified_at,
+					};
+				});
+
+				if (encryptedNotes.length > 0) {
+					supabase
+						.from("notes")
+						.upsert(encryptedNotes, {
+							onConflict: "id",
+						})
+						.then((res) => {
+							if (res.error) {
+								throwError(res.error, res.error.message);
+							}
+						});
+				}
+			});
+
 		await supabase
 			.from("notes")
 			.upsert(encryptedNotes, {
