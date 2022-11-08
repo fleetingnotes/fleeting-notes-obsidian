@@ -45,7 +45,9 @@ export class InputModal extends Modal {
 				text.onChange((value) => {
 					this.values[input.value] = value;
 				})
-        text.inputEl.type = input.type;
+        if (input.type) {
+          text.inputEl.type = input.type;
+        }
       });
 		}
 
