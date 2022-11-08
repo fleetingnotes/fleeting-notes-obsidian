@@ -72,7 +72,6 @@ export const getAllNotesSupabase = async ({
 	filterKey: string;
 }) => {
 	let notes: Note[] = [];
-	console.log("getAllNotesSupabase", firebaseId, supabaseId, key, filterKey);
 
 	try {
 		if (!firebaseId) {
@@ -170,7 +169,6 @@ export const updateNotesSupabase = async ({
 	key: string;
 	notes: Array<any>;
 }) => {
-	console.log("notes", notes);
 	try {
 		let encryptedNotes = Array.from(
 			notes.map((note: any) => encryptNote(note, key))
