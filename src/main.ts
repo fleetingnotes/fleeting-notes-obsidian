@@ -239,26 +239,17 @@ export default class FleetingNotesPlugin extends Plugin {
 			var formattedNotes = await Promise.all(
 				modifiedNotes.map(async (note) => {
 					var { file, frontmatter, content } = note;
-					var timezoneOffset = new Date().getTimezoneOffset() * 60000; //offset in milliseconds
 					return {
 						id: frontmatter.id,
 						title: frontmatter.title ? file.basename : "",
 						content: content || "",
 						source: frontmatter.source || "",
 						deleted: frontmatter.deleted || false,
-						// make a new Date() without converting to utc but using iso string
-						modified_at: new Date(
-							new Date(file.stat.mtime).getTime() - timezoneOffset
-						).toUTCString(),
+						modified_at: new Date(file.stat.mtime).toISOString(),
 					};
 				})
 			);
 			if (formattedNotes.length > 0) {
-				// await updateNotesFirebase(
-
-				// 	this.settings.encryption_key,
-				// 	formattedNotes
-				// );
 				await updateNotesSupabase({
 					firebaseId: this.settings.firebaseId,
 					supabaseId: this.settings.supabaseId,
