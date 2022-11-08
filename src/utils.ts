@@ -178,76 +178,57 @@ export const updateNotesSupabase = async ({
 		let supabaseNotes: SupabaseNote[] = [];
 		let noteIds = encryptedNotes.map((note) => note.id);
 		// get all fields of the note
-		await supabase
-			.from("notes")
-			.select()
-			.in("_partition", [firebaseId, supabaseId])
-			.eq("deleted", false)
-			.in("id", noteIds)
-			.then((res) => {
-				if (res.error) {
-					throwError(res.error, res.error.message);
-				}
-				supabaseNotes = res.data;
+    const res = await supabase
+      .from("notes")
+      .select()
+      .in("_partition", [firebaseId, supabaseId])
+      .eq("deleted", false)
+      .in("id", noteIds)
 
-				// needs to be updated if modified date of note is different from supabase modified_at date
-				// use timezoneOffset to make them both same time
-				encryptedNotes = encryptedNotes.filter((note) => {
-					let supabaseNote = res.data.find(
-						(supabaseNote: any) => supabaseNote.id === note.id
-					);
-					if (!supabaseNote) {
-						return false;
-					}
+    if (res.error) {
+      throwError(res.error, res.error.message);
+    }
+    supabaseNotes = res.data;
 
-					return (
-						new Date(supabaseNote?.modified_at) <
-						new Date(new Date(note.modified_at))
-					);
-				});
+    // only take notes that are modified after note from db & note exists
+    encryptedNotes = encryptedNotes.filter((note) => {
+      let supabaseNote = res.data.find(
+        (supabaseNote: any) => supabaseNote.id === note.id
+      );
+      return (supabaseNote) ? true : false;
+    });
 
-				//merge possibly updated fields
-				encryptedNotes = encryptedNotes.map((note) => {
-					let supabaseNote = supabaseNotes?.find(
-						(supabaseNote: any) => supabaseNote.id === note.id
-					);
-					return {
-						...supabaseNote,
-						title: note.title,
-						content: note.content,
-						source: note.source,
-						modified_at: note.modified_at,
-					};
-				});
+    // merge possibly updated fields
+    encryptedNotes = encryptedNotes.map((note) => {
+      let supabaseNote = supabaseNotes?.find(
+        (supabaseNote: any) => supabaseNote.id === note.id
+      );
+      return {
+        ...supabaseNote,
+        title: note.title || supabaseNote.title,
+        content: note.content || supabaseNote.content,
+        source: note.source || supabaseNote.source,
+        modified_at: new Date().toISOString(),
+        deleted: note.deleted || supabaseNote.deleted,
+      };
+    });
 
-				if (encryptedNotes.length > 0) {
-					supabase
-						.from("notes")
-						.upsert(encryptedNotes, {
-							onConflict: "id",
-						})
-						.then((res) => {
-							if (res.error) {
-								throwError(res.error, res.error.message);
-							}
-						});
-				}
-			});
-
-		await supabase
-			.from("notes")
-			.upsert(encryptedNotes, {
-				onConflict: "id",
-			})
-			.then((res) => {
-				if (res.error) {
-					throwError(res.error, res.error.message);
-				}
-			});
+    if (encryptedNotes.length > 0) {
+      supabase
+        .from("notes")
+        .upsert(encryptedNotes, {
+          onConflict: "id",
+        })
+        .then((res) => {
+          if (res.error) {
+            throwError(res.error, res.error.message);
+          }
+        });
+    }
 	} catch (e) {
 		throwError(
 			e,
-			"Failed to update notes in Fleeting Notes - Check your credentials"
+			"Failed to update notes in Fleeting Notes"
 		);
 	}
 };
