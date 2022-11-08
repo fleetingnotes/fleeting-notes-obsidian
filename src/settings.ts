@@ -7,7 +7,6 @@ import {
 } from "obsidian";
 import FleetingNotesPlugin from "./main";
 import { openInputModal, loginSupabase } from "utils";
-import { Values } from "./components/inputModal";
 
 export interface FleetingNotesSettings {
 	auto_generate_title: boolean;
@@ -62,6 +61,7 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 				{
 					label: "Password",
 					value: "password",
+          type: "password",
 				},
 			],
 			"Login",
@@ -93,32 +93,6 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl("h2", { text: "Authentication" });
-
-		// new Setting(containerEl)
-		// 	.setName("Email")
-		// 	.setDesc("Email used to log into Fleeting Notes")
-		// 	.addText((text) =>
-		// 		text
-		// 			.setPlaceholder("Enter email")
-		// 			.setValue(this.plugin.settings.username)
-		// 			.onChange(async (value) => {
-		// 				this.plugin.settings.username = value;
-		// 				await this.plugin.saveSettings();
-		// 			})
-		// 	);
-
-		// new Setting(containerEl)
-		// 	.setName("Password")
-		// 	.setDesc("Password used to log into Fleeting Notes")
-		// 	.addText((text) => {
-		// 		text.setPlaceholder("Enter password")
-		// 			.setValue(this.plugin.settings.password)
-		// 			.onChange(async (value) => {
-		// 				this.plugin.settings.password = value;
-		// 				await this.plugin.saveSettings();
-		// 			});
-		// 		text.inputEl.type = "password";
-		// 	});
 
 		new Setting(containerEl)
 			.setName("Account")

@@ -1,9 +1,9 @@
 import { App, Modal, Setting } from "obsidian";
-import React from "react";
 
 export interface ModalInputField {
 	label: string;
 	value: string;
+  type?: string | undefined;
 }
 
 export interface Values {
@@ -41,11 +41,12 @@ export class InputModal extends Modal {
 		contentEl.createEl("h1", { text: this.title });
 
 		for (const input of this.inputs) {
-			new Setting(contentEl).setName(input.label).addText((text) =>
+			new Setting(contentEl).setName(input.label).addText((text) => {
 				text.onChange((value) => {
 					this.values[input.value] = value;
 				})
-			);
+        text.inputEl.type = input.type;
+      });
 		}
 
 		new Setting(contentEl).addButton((btn) =>
