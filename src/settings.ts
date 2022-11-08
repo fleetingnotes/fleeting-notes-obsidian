@@ -199,13 +199,9 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 			.setDesc("Will generate based on note content")
 			.addToggle((tog) =>
 				tog
-					.setValue(this.plugin.settings.sync_on_startup)
+					.setValue(this.plugin.settings.auto_generate_title)
 					.onChange(async (val) => {
-						this.plugin.settings.sync_on_startup = val;
-						val
-							? (this.plugin.settings.auto_generate_title = true)
-							: (this.plugin.settings.auto_generate_title =
-									false);
+						this.plugin.settings.auto_generate_title = val;
 						await this.plugin.saveSettings();
 					})
 			);
