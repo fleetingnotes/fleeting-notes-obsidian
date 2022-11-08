@@ -170,11 +170,8 @@ export const updateNotesSupabase = async ({
 	notes: Array<any>;
 }) => {
 	try {
-		let encryptedNotes = Array.from(
-			notes.map((note: any) => encryptNote(note, key))
-		);
 		let supabaseNotes: SupabaseNote[] = [];
-		let noteIds = encryptedNotes.map((note) => note.id);
+		let noteIds = notes.map((note) => note.id);
 		// get all fields of the note
     const res = await supabase
       .from("notes")
@@ -189,7 +186,7 @@ export const updateNotesSupabase = async ({
     supabaseNotes = res.data;
 
     // only take notes that are modified after note from db & note exists
-    encryptedNotes = encryptedNotes.filter((note) => {
+    notes = notes.filter((note) => {
       let supabaseNote = res.data.find(
         (supabaseNote: any) => supabaseNote.id === note.id
       );
@@ -197,11 +194,11 @@ export const updateNotesSupabase = async ({
     });
 
     // merge possibly updated fields
-    encryptedNotes = encryptedNotes.map((note) => {
+    notes = notes.map((note) => {
       let supabaseNote = supabaseNotes?.find(
         (supabaseNote: any) => supabaseNote.id === note.id
       );
-      return {
+      var newNote = {
         ...supabaseNote,
         title: note.title || supabaseNote.title,
         content: note.content || supabaseNote.content,
@@ -209,12 +206,13 @@ export const updateNotesSupabase = async ({
         modified_at: new Date().toISOString(),
         deleted: note.deleted || supabaseNote.deleted,
       };
+      return (supabaseNote.encrypted) ? encryptNote(newNote, key) : newNote;
     });
 
-    if (encryptedNotes.length > 0) {
+    if (notes.length > 0) {
       supabase
         .from("notes")
-        .upsert(encryptedNotes, {
+        .upsert(notes, {
           onConflict: "id",
         })
         .then((res) => {
