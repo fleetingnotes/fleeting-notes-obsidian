@@ -521,7 +521,7 @@ export default class FleetingNotesPlugin extends Plugin {
 					path = path + ".md";
 				}
 				try {
-					var noteFile = existingNoteMap.get(note._id) || null;
+					var noteFile = existingNoteMap.get(note.id) || null;
 					const add_deleted =
 						this.settings.sync_type === "one-way-delete";
 					var mdContent = this.getFilledTemplate(
