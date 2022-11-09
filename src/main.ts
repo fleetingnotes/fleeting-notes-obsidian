@@ -496,12 +496,12 @@ export default class FleetingNotesPlugin extends Plugin {
 			ObsidianNote
 		>();
 
-		let existingTitles: string[] = [];
+		let existingTitles: Set<string> = new Set();
 		try {
 			var existingNotes = await this.getExistingFleetingNotes(folder);
 			existingNotes.forEach((note) => {
 				existingNoteMap.set(note.frontmatter.id, note);
-				existingTitles.push(note.file.name);
+				existingTitles.add(note.file.name);
 			});
 			var folderExists = await this.app.vault.adapter.exists(folder);
 			if (!folderExists) {
@@ -516,6 +516,8 @@ export default class FleetingNotesPlugin extends Plugin {
 							existingTitles,
 							this.settings.auto_generate_title
 					  );
+        // update existing titles
+        existingTitles.add(title)
 				var path = this.convertObsidianPath(pathJoin([folder, title]));
 				if (!path.includes(".md")) {
 					path = path + ".md";

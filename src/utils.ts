@@ -1,4 +1,3 @@
-import { request } from "obsidian";
 import { Note } from "./main";
 var CryptoJS = require("crypto-js");
 import { AuthResponse, createClient } from "@supabase/supabase-js";
@@ -248,32 +247,21 @@ export const extractAllTags = (text: string): string[] => {
 };
 export const getDefaultNoteTitle = (
 	note: Note,
-	existingTitles: string[],
+	existingTitles: Set<string>,
 	autoGenerateTitle: boolean
 ) => {
-	if (!autoGenerateTitle) {
-		const newTitle = `${note.id}.md`;
-		existingTitles.push(newTitle);
-		return newTitle;
+  const titleFromContent = note.content
+    .substring(0, 40)
+    .replace(/[\n\r]/g, ' ')
+    .replace(/([*'/\\<>?:|])/g, "");
+	if (!autoGenerateTitle || titleFromContent.length === 0) {
+		return `${note.id}.md`;
 	}
-
-	let title = note.content.substring(0, 40);
-	let cutByNewLine = false;
-	if (note.content.indexOf("\n") > 0 && note.content.indexOf("\n") < 40) {
-		title = note.content.substring(0, note.content.indexOf("\n"));
-		cutByNewLine = true;
-	}
-	title.replace(/([*'/\\<>?:|])/g, "");
-	if (!existingTitles.includes(title || `${title}.md`)) {
-		const newTitle = title.replace(/([*'/\\<>:?|])/g, "");
-		existingTitles.push(newTitle);
-		return `${newTitle}.md`;
-	}
-
-	const counter = existingTitles.filter((existingTitle) => {
-		return title === existingTitle;
-	}).length;
-	const newTitle = title + ` (${counter})`;
-	existingTitles.push(title);
-	return `${newTitle}.md`;
+  let tempTitle = titleFromContent;
+  let i = 1;
+  while (existingTitles.has(`${tempTitle}.md`)) {
+    tempTitle = `${titleFromContent} (${i})`;
+    i++;
+  }
+  return `${tempTitle}.md`;
 };
