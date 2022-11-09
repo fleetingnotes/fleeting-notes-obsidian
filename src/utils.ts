@@ -250,13 +250,13 @@ export const getDefaultNoteTitle = (
 	existingTitles: Set<string>,
 	autoGenerateTitle: boolean
 ) => {
-	if (!autoGenerateTitle) {
-		return `${note.id}.md`;
-	}
   const titleFromContent = note.content
     .substring(0, 40)
     .replace(/[\n\r]/g, ' ')
     .replace(/([*'/\\<>?:|])/g, "");
+	if (!autoGenerateTitle || titleFromContent.length === 0) {
+		return `${note.id}.md`;
+	}
   let tempTitle = titleFromContent;
   let i = 1;
   while (existingTitles.has(`${tempTitle}.md`)) {
