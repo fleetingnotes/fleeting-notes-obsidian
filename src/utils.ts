@@ -210,16 +210,14 @@ export const updateNotesSupabase = async ({
     });
 
     if (notes.length > 0) {
-      supabase
+      const { error } = await supabase
         .from("notes")
         .upsert(notes, {
           onConflict: "id",
         })
-        .then((res) => {
-          if (res.error) {
-            throwError(res.error, res.error.message);
-          }
-        });
+      if (error) {
+        throwError(error, error.message);
+      }
     }
 	} catch (e) {
 		throwError(
