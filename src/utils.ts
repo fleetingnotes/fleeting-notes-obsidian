@@ -37,10 +37,6 @@ export function throwError(e: any, errMessage: string) {
 	}
 }
 
-const firebaseUrl =
-	"https://us-central1-fleetingnotes-22f77.cloudfunctions.net";
-// takes in API key & query
-
 export const loginSupabase = async (
 	email: string,
 	password: string
@@ -108,41 +104,6 @@ export const getAllNotesSupabase = async ({
 		);
 	}
 	return notes;
-};
-
-export const updateNotesFirebase = async (
-	email: string,
-	password: string,
-	key: string,
-	notes: Array<any>
-) => {
-	try {
-		const base64Auth = btoa(`${email}:${password}`);
-		var encryptedNotes = Array.from(
-			notes.map((note: any) => encryptNote(note, key))
-		);
-		const config = {
-			method: "post",
-			url: `${firebaseUrl}/update_notes`,
-			contentType: "application/json",
-			headers: {
-				Authorization: `Basic ${base64Auth}`,
-				"hashed-encryption-key": key
-					? CryptoJS.SHA256(key).toString()
-					: undefined,
-				notes: JSON.stringify(encryptedNotes),
-			},
-		};
-		const res = JSON.parse(await request(config));
-		if (res.error) {
-			throwError(Error(res.error), res.error);
-		}
-	} catch (e) {
-		throwError(
-			e,
-			"Failed to update notes in Fleeting Notes - Check your credentials"
-		);
-	}
 };
 
 interface SupabaseNote {
