@@ -1,9 +1,27 @@
 import { request } from "obsidian";
 import { Note } from "./main";
 var CryptoJS = require("crypto-js");
+import { AuthResponse, createClient } from "@supabase/supabase-js";
+import { InputModal, Values, ModalInputField } from "./components/inputModal";
+
+// Create a single supabase client for interacting with your database
+const supabase = createClient(
+	"https://yixcweyqwkqyvebpmdvr.supabase.co",
+	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpeGN3ZXlxd2txeXZlYnBtZHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NjQ4MDMyMTgsImV4cCI6MTk4MDM3OTIxOH0.awfZKRuaLOPzniEJ2CIth8NWPYnelLfsWrMWH2Bz3w8"
+);
+
+export function openInputModal(
+	title: string,
+	inputs: ModalInputField[],
+	submitText: string,
+	onSubmit: (results: Values) => void
+) {
+	new InputModal(this.app, { title, inputs, submitText, onSubmit }).open();
+}
 
 // helper functions
 // https://stackoverflow.com/a/29855282/13659833
+
 export function pathJoin(parts: Array<string>, sep: string = "/") {
 	var separator = sep || "/";
 	var replace = new RegExp(separator + "{1,}", "g");
@@ -19,41 +37,65 @@ export function throwError(e: any, errMessage: string) {
 	}
 }
 
-const firebaseUrl =
-	"https://us-central1-fleetingnotes-22f77.cloudfunctions.net";
-// takes in API key & query
-export const getAllNotesFirebase = async (
+export const loginSupabase = async (
 	email: string,
-	password: string,
-	key: string,
-	filterKey: string
-) => {
-	let notes: Note[] = [];
+	password: string
+): Promise<any> => {
 	try {
-		const base64Auth = btoa(`${email}:${password}`);
-		const config = {
-			method: "post",
-			url: `${firebaseUrl}/get_all_notes`,
-			contentType: "application/json",
-			headers: {
-				Authorization: `Basic ${base64Auth}`,
-				"hashed-encryption-key": key
-					? CryptoJS.SHA256(key).toString()
-					: undefined,
-			},
-		};
-		const res = JSON.parse(await request(config));
-		if (res.error) {
-			throwError(Error(res.error), res.error);
-		}
-		notes = Array.from(res.map((note: any) => decryptNote(note, key)));
-		if (filterKey) {
-			notes = notes.filter(
-				(note) =>
-					note.title.includes(filterKey) ||
-					note.content.includes(filterKey)
+		const supaRes: AuthResponse = await supabase.auth
+			.signInWithPassword({
+				email,
+				password,
+			})
+			.then((res) => {
+				return res;
+			});
+		return supaRes;
+	} catch (err) {
+		throwError(err, err.message);
+	}
+};
+
+export const getAllNotesSupabase = async ({
+	firebaseId,
+	supabaseId,
+	key,
+	filterKey,
+}: {
+	firebaseId: string;
+	supabaseId: string;
+	key: string;
+	filterKey: string;
+}) => {
+	let notes: Note[] = [];
+
+	try {
+		if (!firebaseId) {
+			throwError(
+				"Fleeting Notes Sync Failed - Please Log In",
+				"Fleeting Notes Sync Failed - Please Log In"
 			);
 		}
+		await supabase
+			.from("notes")
+			.select()
+			.filter("_partition", "in", `(${firebaseId},${supabaseId})`)
+			.filter("deleted", "eq", false)
+			.then((res) => {
+				if (res.error) {
+					throwError(res.error, res.error.message);
+				}
+				notes = Array.from(
+					res.data?.map((note: any) => decryptNote(note, key)) || []
+				);
+				if (filterKey) {
+					notes = notes.filter(
+						(note) =>
+							note.title.includes(filterKey) ||
+							note.content.includes(filterKey)
+					);
+				}
+			});
 		return notes;
 	} catch (e) {
 		throwError(
@@ -64,43 +106,90 @@ export const getAllNotesFirebase = async (
 	return notes;
 };
 
-export const updateNotesFirebase = async (
-	email: string,
-	password: string,
-	key: string,
-	notes: Array<any>
-) => {
+interface SupabaseNote {
+	id: string;
+	title: string;
+	content: string;
+	source: string;
+	created_at: string;
+	modified_at: string;
+	deleted: boolean;
+	shared: boolean;
+	encrypted: boolean;
+	_partition: string;
+}
+
+export const updateNotesSupabase = async ({
+	firebaseId,
+	supabaseId,
+	key,
+	notes,
+}: {
+	firebaseId: string;
+	supabaseId: string;
+	key: string;
+	notes: Array<any>;
+}) => {
 	try {
-		const base64Auth = btoa(`${email}:${password}`);
-		var encryptedNotes = Array.from(
-			notes.map((note: any) => encryptNote(note, key))
-		);
-		const config = {
-			method: "post",
-			url: `${firebaseUrl}/update_notes`,
-			contentType: "application/json",
-			headers: {
-				Authorization: `Basic ${base64Auth}`,
-				"hashed-encryption-key": key
-					? CryptoJS.SHA256(key).toString()
-					: undefined,
-				notes: JSON.stringify(encryptedNotes),
-			},
-		};
-		const res = JSON.parse(await request(config));
-		if (res.error) {
-			throwError(Error(res.error), res.error);
-		}
+		let supabaseNotes: SupabaseNote[] = [];
+		let noteIds = notes.map((note) => note.id);
+		// get all fields of the note
+    const res = await supabase
+      .from("notes")
+      .select()
+      .in("_partition", [firebaseId, supabaseId])
+      .eq("deleted", false)
+      .in("id", noteIds)
+
+    if (res.error) {
+      throwError(res.error, res.error.message);
+    }
+    supabaseNotes = res.data;
+
+    // only take notes that are modified after note from db & note exists
+    notes = notes.filter((note) => {
+      let supabaseNote = res.data.find(
+        (supabaseNote: any) => supabaseNote.id === note.id
+      );
+      return (supabaseNote) ? true : false;
+    });
+
+    // merge possibly updated fields
+    notes = notes.map((note) => {
+      let supabaseNote = supabaseNotes?.find(
+        (supabaseNote: any) => supabaseNote.id === note.id
+      );
+      var newNote = {
+        ...supabaseNote,
+        title: note.title || supabaseNote.title,
+        content: note.content || supabaseNote.content,
+        source: note.source || supabaseNote.source,
+        modified_at: new Date().toISOString(),
+        deleted: note.deleted || supabaseNote.deleted,
+      };
+      return (supabaseNote.encrypted) ? encryptNote(newNote, key) : newNote;
+    });
+
+    if (notes.length > 0) {
+      const { error } = await supabase
+        .from("notes")
+        .upsert(notes, {
+          onConflict: "id",
+        })
+      if (error) {
+        throwError(error, error.message);
+      }
+    }
 	} catch (e) {
 		throwError(
 			e,
-			"Failed to update notes in Fleeting Notes - Check your credentials"
+			"Failed to update notes in Fleeting Notes"
 		);
 	}
 };
 
 export const decryptNote = (note: any, key: string) => {
-	if (note.is_encrypted) {
+	if (note.encrypted) {
 		if (key === "") {
 			throwError(
 				Error("No encryption key found"),
@@ -163,7 +252,7 @@ export const getDefaultNoteTitle = (
 	autoGenerateTitle: boolean
 ) => {
 	if (!autoGenerateTitle) {
-		const newTitle = `${note._id}.md`;
+		const newTitle = `${note.id}.md`;
 		existingTitles.push(newTitle);
 		return newTitle;
 	}

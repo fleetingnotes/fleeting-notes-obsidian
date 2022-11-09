@@ -1,5 +1,12 @@
-import { App, PluginSettingTab, Setting, TextAreaComponent } from "obsidian";
+import {
+	App,
+	Notice,
+	PluginSettingTab,
+	Setting,
+	TextAreaComponent,
+} from "obsidian";
 import FleetingNotesPlugin from "./main";
+import { openInputModal, loginSupabase } from "utils";
 
 export interface FleetingNotesSettings {
 	auto_generate_title: boolean;
@@ -9,8 +16,8 @@ export interface FleetingNotesSettings {
 	notes_filter: string;
 	sync_on_startup: boolean;
 	last_sync_time: Date;
-	username: string;
-	password: string;
+	firebaseId: any;
+	supabaseId: any;
 	encryption_key: string;
 	sync_interval: NodeJS.Timer | undefined;
 }
@@ -24,18 +31,59 @@ export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	last_sync_time: new Date(0),
 	sync_type: "one-way",
 	notes_filter: "",
-	username: "",
-	password: "",
+	firebaseId: undefined,
+	supabaseId: undefined,
 	encryption_key: "",
 	sync_interval: undefined,
 };
-
 export class FleetingNotesSettingsTab extends PluginSettingTab {
 	plugin: FleetingNotesPlugin;
 
 	constructor(app: App, plugin: FleetingNotesPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	async manageAccount(btn: any) {
+		if (this.plugin.settings.firebaseId || this.plugin.settings.supabaseId) {
+			this.plugin.settings.firebaseId = undefined;
+			this.plugin.settings.supabaseId = undefined;
+			btn.setButtonText("Sign In").setCta();
+			return;
+		}
+		openInputModal(
+			"Login to Fleeting Notes",
+			[
+				{
+					label: "Email",
+					value: "email",
+				},
+				{
+					label: "Password",
+					value: "password",
+          type: "password",
+				},
+			],
+			"Login",
+			async (result) => {
+				const supaRes = await loginSupabase(
+					result.email,
+					result.password
+				);
+				const supaSuccess =
+					supaRes === null || supaRes.error ? false : true;
+				if (supaSuccess) {
+					this.plugin.settings.firebaseId =
+						supaRes.data.user.user_metadata.firebaseUid;
+					this.plugin.settings.supabaseId = supaRes.data.user.id;
+					btn.setButtonText("Sign Out").setCta();
+				} else {
+					new Notice(`Login failed - ${supaRes.error.message}`);
+				}
+
+				this.plugin.saveSettings();
+			}
+		);
 	}
 
 	display(): void {
@@ -47,30 +95,16 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 		containerEl.createEl("h2", { text: "Authentication" });
 
 		new Setting(containerEl)
-			.setName("Email")
-			.setDesc("Email used to log into Fleeting Notes")
-			.addText((text) =>
-				text
-					.setPlaceholder("Enter email")
-					.setValue(this.plugin.settings.username)
-					.onChange(async (value) => {
-						this.plugin.settings.username = value;
-						await this.plugin.saveSettings();
-					})
+			.setName("Account")
+			.setDesc("Manage your Fleeting Notes Account")
+			.addButton((btn: any) =>
+				btn
+					.setButtonText(
+						this.plugin.settings.supabaseId ? "Sign Out" : "Sign In"
+					)
+					.setCta()
+					.onClick(async () => await this.manageAccount(btn))
 			);
-
-		new Setting(containerEl)
-			.setName("Password")
-			.setDesc("Password used to log into Fleeting Notes")
-			.addText((text) => {
-				text.setPlaceholder("Enter password")
-					.setValue(this.plugin.settings.password)
-					.onChange(async (value) => {
-						this.plugin.settings.password = value;
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = "password";
-			});
 
 		new Setting(containerEl)
 			.setName("Encryption key")
