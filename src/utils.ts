@@ -253,7 +253,7 @@ export const getDefaultNoteTitle = (
   const titleFromContent = note.content
     .substring(0, 40)
     .replace(/[\n\r]/g, ' ')
-    .replace(/([*'/\\<>?:|])/g, "");
+    .replace(/([\[\]\#\*\:\/\\\^\.])/g, "");
 	if (!autoGenerateTitle || titleFromContent.length === 0) {
 		return `${note.id}.md`;
 	}

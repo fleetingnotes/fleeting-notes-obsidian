@@ -488,6 +488,17 @@ export default class FleetingNotesPlugin extends Plugin {
 		});
 		return notesWithSameSource;
 	}
+  getFilenamesInFolder(folder: string): Set<string> {
+    let existingTitlesInFolder: Set<string> = new Set();
+    this.app.vault.getFiles().forEach((file) => {
+      var fileInDir =
+        folder === "/"
+          ? !file.path.contains("/")
+          : file.path.startsWith(folder);
+      if (fileInDir) existingTitlesInFolder.add(file.name)
+    });
+    return existingTitlesInFolder;
+  }
 
 	// writes notes to obsidian
 	async writeNotes(notes: Array<Note>, folder: string) {
@@ -496,13 +507,10 @@ export default class FleetingNotesPlugin extends Plugin {
 			string,
 			ObsidianNote
 		>();
-
-		let existingTitles: Set<string> = new Set();
 		try {
 			var existingNotes = await this.getExistingFleetingNotes(folder);
 			existingNotes.forEach((note) => {
 				existingNoteMap.set(note.frontmatter.id, note);
-				existingTitles.add(note.file.name);
 			});
 			var folderExists = await this.app.vault.adapter.exists(folder);
 			if (!folderExists) {
@@ -510,16 +518,16 @@ export default class FleetingNotesPlugin extends Plugin {
 			}
 			for (var i = 0; i < notes.length; i++) {
 				var note = notes[i];
-				var title = note.title
+        var filenamesInFolder = this.getFilenamesInFolder(folder);
+				var noteFileName = note.title
 					? `${note.title}.md`
 					: getDefaultNoteTitle(
 							note,
-							existingTitles,
+							filenamesInFolder,
 							this.settings.auto_generate_title
 					  );
         // update existing titles
-        existingTitles.add(title)
-				var path = this.convertObsidianPath(pathJoin([folder, title]));
+				var path = this.convertObsidianPath(pathJoin([folder, noteFileName]));
 				if (!path.includes(".md")) {
 					path = path + ".md";
 				}
