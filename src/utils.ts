@@ -131,14 +131,13 @@ export const updateNotesSupabase = async ({
 }) => {
 	try {
 		let supabaseNotes: SupabaseNote[] = [];
-		let noteIds = notes.map((note) => note.id);
+		let noteIds = new Set(notes.map((note) => note.id));
 		// get all fields of the note
     const res = await supabase
       .from("notes")
       .select()
       .in("_partition", [firebaseId, supabaseId])
       .eq("deleted", false)
-      .in("id", noteIds)
 
     if (res.error) {
       throwError(res.error, res.error.message);
@@ -148,7 +147,8 @@ export const updateNotesSupabase = async ({
     // only take notes that are modified after note from db & note exists
     notes = notes.filter((note) => {
       let supabaseNote = res.data.find(
-        (supabaseNote: any) => supabaseNote.id === note.id
+        (supabaseNote: any) => 
+        supabaseNote.id === note.id && noteIds.has(supabaseNote.id)
       );
       return (supabaseNote) ? true : false;
     });
@@ -219,7 +219,7 @@ export const encryptNote = (note: any, key: string) => {
 		if (note.source) {
 			note.source = encryptText(note.source, key);
 		}
-		note.is_encrypted = true;
+		note.encrypted = true;
 	}
 	return note as Note;
 };
@@ -253,7 +253,7 @@ export const getDefaultNoteTitle = (
   const titleFromContent = note.content
     .substring(0, 40)
     .replace(/[\n\r]/g, ' ')
-    .replace(/([*'/\\<>?:|])/g, "");
+    .replace(/([\[\]\#\*\:\/\\\^\.])/g, "");
 	if (!autoGenerateTitle || titleFromContent.length === 0) {
 		return `${note.id}.md`;
 	}
