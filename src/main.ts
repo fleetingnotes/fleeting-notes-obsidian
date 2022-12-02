@@ -53,8 +53,10 @@ export default class FleetingNotesPlugin extends Plugin {
 			id: "sync-fleeting-notes",
 			name: "Sync Notes with Fleeting Notes",
 			callback: async () => {
-				await this.syncFleetingNotes();
-        new Notice("Fleeting Notes Sync Success")
+				const isSuccess = await this.syncFleetingNotes();
+        if (isSuccess) {
+          new Notice("Fleeting Notes Sync Success")
+        }
 			},
 		});
 
@@ -214,7 +216,7 @@ export default class FleetingNotesPlugin extends Plugin {
 	async syncFleetingNotes() {
     if (!this.isUserSignedIn()) {
       new Notice("No login credentials found")
-      return;
+      return false;
     }
 		try {
 			if (this.settings.sync_type === "two-way") {
@@ -233,6 +235,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				await this.deleteFleetingNotes(notes);
 			}
 			this.settings.last_sync_time = new Date();
+      return true;
 		} catch (e) {
 			if (typeof e === "string") {
 				new Notice(e);
@@ -241,6 +244,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				new Notice("Fleeing Notes sync failed - please check settings");
 			}
 		}
+    return false;
 	}
 
 	async appendStringToActiveFile(content: string) {
