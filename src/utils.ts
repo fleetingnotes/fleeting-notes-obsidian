@@ -49,11 +49,24 @@ export const loginSupabase = async (
 			.then((res) => {
 				return res;
 			});
+    if (supaRes.error) {
+      throwError(supaRes.error, supaRes.error.message);
+    }
 		return supaRes;
 	} catch (err) {
 		throwError(err, err.message);
 	}
 };
+
+export const onAuthStateChange = async (callback: (event: string) => void) => {
+  // check user logged in
+  supabase.auth.getUser().then((v) => {
+    if (!v.data?.user) {
+      callback("SIGNED_OUT");
+    }
+  });
+  return supabase.auth.onAuthStateChange(callback);
+}
 
 export const getAllNotesSupabase = async ({
 	firebaseId,

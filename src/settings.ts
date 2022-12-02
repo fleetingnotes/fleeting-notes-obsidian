@@ -16,8 +16,10 @@ export interface FleetingNotesSettings {
 	notes_filter: string;
 	sync_on_startup: boolean;
 	last_sync_time: Date;
-	firebaseId: any;
-	supabaseId: any;
+	firebaseId: string | undefined;
+	supabaseId: string | undefined;
+  email: string | undefined;
+  password: string | undefined;
 	encryption_key: string;
 	sync_interval: NodeJS.Timer | undefined;
 }
@@ -31,6 +33,8 @@ export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	last_sync_time: new Date(0),
 	sync_type: "one-way",
 	notes_filter: "",
+  email: undefined,
+  password: undefined,
 	firebaseId: undefined,
 	supabaseId: undefined,
 	encryption_key: "",
@@ -44,10 +48,10 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+
 	async manageAccount(btn: any) {
-		if (this.plugin.settings.firebaseId || this.plugin.settings.supabaseId) {
-			this.plugin.settings.firebaseId = undefined;
-			this.plugin.settings.supabaseId = undefined;
+		if (this.plugin.isUserSignedIn()) {
+      this.plugin.signOutUser();
 			btn.setButtonText("Sign In").setCta();
 			return;
 		}
@@ -76,6 +80,8 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 					this.plugin.settings.firebaseId =
 						supaRes.data.user.user_metadata.firebaseUid;
 					this.plugin.settings.supabaseId = supaRes.data.user.id;
+          this.plugin.settings.email = result.email;
+          this.plugin.settings.password = result.password;
 					btn.setButtonText("Sign Out").setCta();
 				} else {
 					new Notice(`Login failed - ${supaRes.error.message}`);
