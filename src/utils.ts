@@ -49,11 +49,18 @@ export const loginSupabase = async (
 			.then((res) => {
 				return res;
 			});
+    if (supaRes.error) {
+      throwError(supaRes.error, supaRes.error.message);
+    }
 		return supaRes;
 	} catch (err) {
 		throwError(err, err.message);
 	}
 };
+
+export const onAuthStateChange = async (callback: (event: string) => void) => {
+  return supabase.auth.onAuthStateChange(callback);
+}
 
 export const getAllNotesSupabase = async ({
 	firebaseId,
