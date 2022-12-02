@@ -44,7 +44,7 @@ export interface Note {
 
 export default class FleetingNotesPlugin extends Plugin {
 	settings: FleetingNotesSettings;
-  supabaseAuthSubscription: Subscription;
+  supabaseAuthSubscription: Subscription | undefined;
 
 	async onload() {
 		await this.loadSettings();
@@ -146,7 +146,7 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	onunload() {
 		this.disableAutoSync();
-    this.supabaseAuthSubscription.unsubscribe();
+    this.supabaseAuthSubscription?.unsubscribe();
 	}
 
 	async loadSettings() {
