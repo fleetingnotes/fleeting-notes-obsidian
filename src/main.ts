@@ -7,6 +7,7 @@ import {
 	TFile,
 	MarkdownView,
 } from "obsidian";
+import SupabaseSync from "supabase_sync";
 import {
 	FleetingNotesSettings,
 	FleetingNotesSettingsTab,
@@ -14,12 +15,8 @@ import {
 } from "./settings";
 
 import {
-	getAllNotesSupabase,
 	throwError,
-	updateNotesSupabase,
 	openInputModal,
-  loginSupabase,
-  onAuthStateChange
 } from "./utils";
 
 export interface ObsidianNote {
@@ -42,6 +39,7 @@ export default class FleetingNotesPlugin extends Plugin {
 	settings: FleetingNotesSettings;
   supabaseAuthSubscription: Subscription | undefined;
   fileSystemSync: FileSystemSync;
+  supabaseSync: SupabaseSync;
 
 	async onload() {
 		await this.loadSettings();
@@ -96,12 +94,15 @@ export default class FleetingNotesPlugin extends Plugin {
 			});
 		}
     // listen for auth state changes
-    const { data } = await onAuthStateChange(this.reloginOnSignout);
+    const { data } = await SupabaseSync.onAuthStateChange(this.reloginOnSignout);
     this.supabaseAuthSubscription = data.subscription;
 
     // init filesystem sync
     this.fileSystemSync = new FileSystemSync(this.app.vault, this.settings);
     await this.fileSystemSync.init()
+
+    /// init supabase sync
+    this.supabaseSync = new SupabaseSync(this.settings);
 	}
 	disableAutoSync() {
 		if (this.settings.sync_interval) {
@@ -113,7 +114,7 @@ export default class FleetingNotesPlugin extends Plugin {
     if (event == "SIGNED_OUT") {
       if (this.settings.email && this.settings.password) {
         try {
-          await loginSupabase(this.settings.email, this.settings.password);
+          await SupabaseSync.loginSupabase(this.settings.email, this.settings.password);
         } catch (e) {
           this.signOutUser();
         }
@@ -219,12 +220,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				await this.pushFleetingNotes();
 			}
 			// pull fleeting notes
-			let notes = await getAllNotesSupabase({
-				firebaseId: this.settings.firebaseId,
-				supabaseId: this.settings.supabaseId,
-				key: this.settings.encryption_key,
-				filterKey: this.settings.notes_filter,
-			});
+			let notes = await this.supabaseSync.getAllNotes();
 			notes = notes.filter((note: Note) => !note.deleted);
       await this.fileSystemSync.upsertNotes(notes);
 			if (this.settings.sync_type == "one-way-delete") {
@@ -269,12 +265,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				})
 			);
 			if (formattedNotes.length > 0) {
-				await updateNotesSupabase({
-					firebaseId: this.settings.firebaseId,
-					supabaseId: this.settings.supabaseId,
-					key: this.settings.encryption_key,
-					notes: formattedNotes,
-				});
+				await this.supabaseSync.updateNotes(formattedNotes);
 				this.settings.last_sync_time = new Date();
 			}
 		} catch (e) {
@@ -296,12 +287,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				})
 			);
 			if (notesToDelete.length > 0) {
-				await updateNotesSupabase({
-					firebaseId: this.settings.firebaseId,
-					supabaseId: this.settings.supabaseId,
-					key: this.settings.encryption_key,
-					notes: notesToDelete,
-				});
+				await this.supabaseSync.updateNotes(notesToDelete);
 			}
 		} catch (e) {
 			throwError(e, "Failed to delete notes from Fleeting Notes");

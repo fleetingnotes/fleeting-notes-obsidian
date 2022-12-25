@@ -23,7 +23,6 @@ class FileSystemSync {
     await this.getAllNotes().then((notes) => {
       notes.forEach(n => this.existingNoteMap.set(n.frontmatter.id, n))
     })
-
   }
 
   dirPath = () => convertObsidianPath(this.settings.fleeting_notes_folder);
@@ -93,6 +92,7 @@ class FileSystemSync {
 		} catch (e) {
 			throwError(e, `Failed to get existing notes from obsidian`);
 		}
+    this.existingNoteMap.clear();
     noteList.forEach(n => this.existingNoteMap.set(n.frontmatter.id, n));
 		return noteList;
   }

@@ -6,7 +6,8 @@ import {
 	TextAreaComponent,
 } from "obsidian";
 import FleetingNotesPlugin from "./main";
-import { openInputModal, loginSupabase } from "utils";
+import { openInputModal } from "utils";
+import SupabaseSync from "supabase_sync";
 
 export interface FleetingNotesSettings {
 	auto_generate_title: boolean;
@@ -70,7 +71,7 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 			],
 			"Login",
 			async (result) => {
-				const supaRes = await loginSupabase(
+				const supaRes = await SupabaseSync.loginSupabase(
 					result.email,
 					result.password
 				);
