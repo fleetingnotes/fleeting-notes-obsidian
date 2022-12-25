@@ -1,6 +1,7 @@
 import { Note } from "./main";
 var CryptoJS = require("crypto-js");
 import { AuthResponse, createClient } from "@supabase/supabase-js";
+import { moment } from "obsidian"
 import { InputModal, Values, ModalInputField } from "./components/inputModal";
 
 // Create a single supabase client for interacting with your database
@@ -278,3 +279,61 @@ export const getDefaultNoteTitle = (
   }
   return `${tempTitle}.md`;
 };
+
+// paths in obsidian are weird, need function to convert to proper path
+export function convertObsidianPath(path: string) {
+  path = path[0] === "/" ? path.replace("/", "") : path;
+  path = path || "/";
+  return path;
+}
+
+// fills the template with the note data
+export function getFilledTemplate(template: string, note: Note, {addDeleted = false}) {
+  const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
+  let content = note.content;
+  let tags: string[] = [];
+  if (template.includes("${tags}")) {
+    tags = extractAllTags(note.content);
+  }
+  if (metadataMatch) {
+    const escapedTitle = note.title.replace(/\"/g, '\\"');
+    const escapedContent = content.replace(/\"/g, '\\"');
+    const escapedSource = note.source.replace(/\"/g, '\\"');
+    const escapedTags = `[${tags.join(", ")}]`;
+    var newMetadata = metadataMatch[1]
+      .replace(/\$\{title\}/gm, escapedTitle)
+      .replace(/\$\{tags\}/gm, escapedTags)
+      .replace(/\$\{content\}/gm, escapedContent)
+      .replace(/\$\{source\}/gm, escapedSource);
+    if (addDeleted) {
+      const deleted_match = newMetadata.match(/^deleted:.*$/);
+      if (deleted_match) {
+        newMetadata = newMetadata.replace(
+          deleted_match[0],
+          "deleted: true"
+        );
+      } else {
+        newMetadata += "\ndeleted: true";
+      }
+    }
+    newMetadata = `---\n${newMetadata}\n---\n`;
+    template = template.replace(metadataMatch[0], newMetadata);
+  }
+  var newTemplate = template
+    .replace(/\$\{id\}/gm, note.id)
+    .replace(/\$\{title\}/gm, note.title)
+    .replace(/\$\{datetime\}/gm, note.created_at)
+    .replace(/\$\{tags\}/gm, `[${tags.join(", ")}]`)
+    .replace(
+      /\$\{created_date\}/gm,
+      moment(note.created_at).local().format("YYYY-MM-DD")
+    )
+    .replace(
+      /\$\{last_modified_date\}/gm,
+      moment(note.modified_at).local().format("YYYY-MM-DD")
+    )
+    .replace(/\$\{content\}/gm, content)
+    .replace(/\$\{source\}/gm, note.source);
+
+  return newTemplate;
+}

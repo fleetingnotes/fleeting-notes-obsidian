@@ -1,11 +1,10 @@
 // import moment
 import { Subscription } from "@supabase/supabase-js";
+import FileSystemSync from "file_system_sync";
 import {
-	moment,
 	Notice,
 	Plugin,
 	TFile,
-	parseYaml,
 	MarkdownView,
 } from "obsidian";
 import {
@@ -15,18 +14,15 @@ import {
 } from "./settings";
 
 import {
-	extractAllTags,
 	getAllNotesSupabase,
-	pathJoin,
 	throwError,
 	updateNotesSupabase,
-	getDefaultNoteTitle,
 	openInputModal,
   loginSupabase,
   onAuthStateChange
 } from "./utils";
 
-interface ObsidianNote {
+export interface ObsidianNote {
 	file: TFile;
 	frontmatter: any;
 	content: string;
@@ -45,6 +41,7 @@ export interface Note {
 export default class FleetingNotesPlugin extends Plugin {
 	settings: FleetingNotesSettings;
   supabaseAuthSubscription: Subscription | undefined;
+  fileSystemSync: FileSystemSync;
 
 	async onload() {
 		await this.loadSettings();
@@ -101,6 +98,10 @@ export default class FleetingNotesPlugin extends Plugin {
     // listen for auth state changes
     const { data } = await onAuthStateChange(this.reloginOnSignout);
     this.supabaseAuthSubscription = data.subscription;
+
+    // init filesystem sync
+    this.fileSystemSync = new FileSystemSync(this.app.vault, this.settings);
+    await this.fileSystemSync.init()
 	}
 	disableAutoSync() {
 		if (this.settings.sync_interval) {
@@ -164,9 +165,7 @@ export default class FleetingNotesPlugin extends Plugin {
 	async insertUnprocessedNotes() {
 		try {
 			const template = "- [ ] ![[${linkText}]]\n";
-			const unprocessedNotes = await this.getUnprocessedFleetingNotes(
-				this.settings.fleeting_notes_folder
-			);
+			const unprocessedNotes = await this.getUnprocessedFleetingNotes();
 			const unprocessedNoteString = this.embedNotesToString(
 				unprocessedNotes,
 				this.app.workspace.getActiveFile().path,
@@ -186,10 +185,7 @@ export default class FleetingNotesPlugin extends Plugin {
 	async embedNotesWithText(text: string) {
 		let sameSourceNotes: ObsidianNote[] = [];
 		try {
-			sameSourceNotes = await this.getNotesWithText(
-				this.settings.fleeting_notes_folder,
-				text
-			);
+			sameSourceNotes = await this.getNotesWithText(text);
 			if (sameSourceNotes.length === 0) {
 				new Notice(`No notes with text "${text}" found`);
 				return;
@@ -230,9 +226,9 @@ export default class FleetingNotesPlugin extends Plugin {
 				filterKey: this.settings.notes_filter,
 			});
 			notes = notes.filter((note: Note) => !note.deleted);
-			await this.writeNotes(notes, this.settings.fleeting_notes_folder);
+      await this.fileSystemSync.upsertNotes(notes);
 			if (this.settings.sync_type == "one-way-delete") {
-				await this.deleteFleetingNotes(notes);
+        await this.deleteFleetingNotes(notes);
 			}
 			this.settings.last_sync_time = new Date();
       return true;
@@ -255,31 +251,10 @@ export default class FleetingNotesPlugin extends Plugin {
 		doc.replaceSelection(content);
 	}
 
-	// returns the frontmatter and content from a note file
-	async parseNoteFile(
-		file: TFile
-	): Promise<{ frontmatter: any; content: string }> {
-		var frontmatter = {};
-		var rawNoteContent = await this.app.vault.read(file);
-		var content = rawNoteContent;
-		try {
-			var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
-			if (m) {
-				frontmatter = parseYaml(m[1]);
-				content = content.replace(m[0], "");
-			}
-		} catch (e) {
-			console.error(e, `Failed to parse metadata for: "${file.path}"`);
-		}
-		return { frontmatter, content };
-	}
-
 	// writes fleeting notes to firebase
 	async pushFleetingNotes() {
 		try {
-			var modifiedNotes = await this.getUpdatedLocalNotes(
-				this.settings.fleeting_notes_folder
-			);
+			var modifiedNotes = await this.getUpdatedLocalNotes();
 			var formattedNotes = await Promise.all(
 				modifiedNotes.map(async (note) => {
 					var { file, frontmatter, content } = note;
@@ -332,94 +307,10 @@ export default class FleetingNotesPlugin extends Plugin {
 			throwError(e, "Failed to delete notes from Fleeting Notes");
 		}
 	}
-	// gets all Fleeting Notes from obsidian
-	async getExistingFleetingNotes(dir: string) {
-		const noteList: Array<ObsidianNote> = [];
-		try {
-			var files = this.app.vault.getFiles();
-			for (var i = 0; i < files.length; i++) {
-				var file = files[i];
-				var fileInDir =
-					dir === "/"
-						? !file.path.contains("/")
-						: file.path.startsWith(dir);
-				if (!fileInDir) continue;
-				var file_id: string;
-				var { frontmatter, content } = await this.parseNoteFile(file);
-				file_id = frontmatter.id || null;
-				if (file_id !== null) {
-					noteList.push({ file, frontmatter, content });
-				}
-			}
-		} catch (e) {
-			throwError(e, `Failed to get existing notes from obsidian`);
-		}
-		return noteList;
-	}
-
-	// paths in obsidian are weird, need function to convert to proper path
-	convertObsidianPath(path: string) {
-		path = path[0] === "/" ? path.replace("/", "") : path;
-		path = path || "/";
-		return path;
-	}
-
-	// fills the template with the note data
-	getFilledTemplate(template: string, note: Note, add_deleted: boolean) {
-		const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
-		let content = note.content;
-		let tags: string[] = [];
-		if (template.includes("${tags}")) {
-			tags = extractAllTags(note.content);
-		}
-		if (metadataMatch) {
-			const escapedTitle = note.title.replace(/\"/g, '\\"');
-			const escapedContent = content.replace(/\"/g, '\\"');
-			const escapedSource = note.source.replace(/\"/g, '\\"');
-			const escapedTags = `[${tags.join(", ")}]`;
-			var newMetadata = metadataMatch[1]
-				.replace(/\$\{title\}/gm, escapedTitle)
-				.replace(/\$\{tags\}/gm, escapedTags)
-				.replace(/\$\{content\}/gm, escapedContent)
-				.replace(/\$\{source\}/gm, escapedSource);
-			if (add_deleted) {
-				const deleted_match = newMetadata.match(/^deleted:.*$/);
-				if (deleted_match) {
-					newMetadata = newMetadata.replace(
-						deleted_match[0],
-						"deleted: true"
-					);
-				} else {
-					newMetadata += "\ndeleted: true";
-				}
-			}
-			newMetadata = `---\n${newMetadata}\n---\n`;
-			template = template.replace(metadataMatch[0], newMetadata);
-		}
-
-		var newTemplate = template
-			.replace(/\$\{id\}/gm, note.id)
-			.replace(/\$\{title\}/gm, note.title)
-			.replace(/\$\{datetime\}/gm, note.created_at)
-			.replace(/\$\{tags\}/gm, `[${tags.join(", ")}]`)
-			.replace(
-				/\$\{created_date\}/gm,
-				moment(note.created_at).local().format("YYYY-MM-DD")
-			)
-			.replace(
-				/\$\{last_modified_date\}/gm,
-				moment(note.modified_at).local().format("YYYY-MM-DD")
-			)
-			.replace(/\$\{content\}/gm, content)
-			.replace(/\$\{source\}/gm, note.source);
-
-		return newTemplate;
-	}
 
 	// returns a list of files that have been modified since the last sync
-	async getUpdatedLocalNotes(folder: string) {
-		folder = this.convertObsidianPath(folder);
-		var existingNotes = await this.getExistingFleetingNotes(folder);
+	async getUpdatedLocalNotes() {
+		var existingNotes = await this.fileSystemSync.getAllNotes();
 		var modifiedNotes = existingNotes.filter((note) => {
 			const { file, frontmatter } = note;
 			const isContentModified =
@@ -448,17 +339,8 @@ export default class FleetingNotesPlugin extends Plugin {
 		return embedNotesString;
 	}
 
-	async getUnprocessedFleetingNotes(folder: string) {
-		folder = this.convertObsidianPath(folder);
-		let existingNotePathMap: Map<string, ObsidianNote> = new Map<
-			string,
-			ObsidianNote
-		>();
-		var existingNotes = await this.getExistingFleetingNotes(folder);
-		existingNotes.forEach((note) =>
-			existingNotePathMap.set(note.file.path, note)
-		);
-
+	async getUnprocessedFleetingNotes(): Promise<ObsidianNote[]> {
+		let existingNotePathMap: Map<String, ObsidianNote> = this.fileSystemSync.existingNoteMap;
 		let skipNotesSet: Set<string> = new Set();
 
 		const resolvedLinks = this.app.metadataCache.resolvedLinks;
@@ -492,22 +374,15 @@ export default class FleetingNotesPlugin extends Plugin {
 				}
 			})
 		);
-		const unprocessedNotes = existingNotes.filter((note) => {
-			return !skipNotesSet.has(note.file.path);
+		const unprocessedNotes = [...existingNotePathMap.keys()].filter((k) => {
+      const path = existingNotePathMap.get(k)?.file.path;
+			return !skipNotesSet.has(path);
 		});
-		return unprocessedNotes;
+		return unprocessedNotes.map((k) => existingNotePathMap.get(k));
 	}
 
-	async getNotesWithText(folder: string, text: string) {
-		folder = this.convertObsidianPath(folder);
-		let existingNotePathMap: Map<string, ObsidianNote> = new Map<
-			string,
-			ObsidianNote
-		>();
-		var existingNotes = await this.getExistingFleetingNotes(folder);
-		existingNotes.forEach((note) =>
-			existingNotePathMap.set(note.file.path, note)
-		);
+	async getNotesWithText(text: string) {
+		var existingNotes = await this.fileSystemSync.getAllNotes();
 		const textInMetaData = (note: ObsidianNote) => {
 			let hasSource = false;
 			if (note.frontmatter) {
@@ -530,82 +405,6 @@ export default class FleetingNotesPlugin extends Plugin {
 			return textInMetaData(note) || hasTextInContent(note);
 		});
 		return notesWithSameSource;
-	}
-  getFilenamesInFolder(folder: string): Set<string> {
-    let existingTitlesInFolder: Set<string> = new Set();
-    this.app.vault.getFiles().forEach((file) => {
-      var fileInDir =
-        folder === "/"
-          ? !file.path.contains("/")
-          : file.path.startsWith(folder);
-      if (fileInDir) existingTitlesInFolder.add(file.name)
-    });
-    return existingTitlesInFolder;
-  }
-
-	// writes notes to obsidian
-	async writeNotes(notes: Array<Note>, folder: string) {
-		folder = this.convertObsidianPath(folder);
-		let existingNoteMap: Map<string, ObsidianNote> = new Map<
-			string,
-			ObsidianNote
-		>();
-		try {
-			var existingNotes = await this.getExistingFleetingNotes(folder);
-			existingNotes.forEach((note) => {
-				existingNoteMap.set(note.frontmatter.id, note);
-			});
-			var folderExists = await this.app.vault.adapter.exists(folder);
-			if (!folderExists) {
-				await this.app.vault.createFolder(folder);
-			}
-			for (var i = 0; i < notes.length; i++) {
-				var note = notes[i];
-        var filenamesInFolder = this.getFilenamesInFolder(folder);
-				var noteFileName = note.title
-					? `${note.title}.md`
-					: getDefaultNoteTitle(
-							note,
-							filenamesInFolder,
-							this.settings.auto_generate_title
-					  );
-        // update existing titles
-				var path = this.convertObsidianPath(pathJoin([folder, noteFileName]));
-				if (!path.includes(".md")) {
-					path = path + ".md";
-				}
-				try {
-					var noteFile = existingNoteMap.get(note.id) || null;
-					const add_deleted =
-						this.settings.sync_type === "one-way-delete";
-					var mdContent = this.getFilledTemplate(
-						this.settings.note_template,
-						note,
-						add_deleted
-					);
-					if (noteFile != null) {
-						// modify file if id exists in frontmatter
-						await this.app.vault.modify(noteFile.file, mdContent);
-						await this.app.vault.rename(noteFile.file, path);
-					} else {
-						// recreate file otherwise
-						var delFile =
-							this.app.vault.getAbstractFileByPath(path);
-						if (delFile != null) {
-							await this.app.vault.delete(delFile);
-						}
-						await this.app.vault.create(path, mdContent);
-					}
-				} catch (e) {
-					throwError(
-						e,
-						`Failed to write note "${path}" to Obsidian.\n\n${e.message}`
-					);
-				}
-			}
-		} catch (e) {
-			throwError(e, "Failed to write notes to Obsidian");
-		}
 	}
 
 	getAllLinks() {
