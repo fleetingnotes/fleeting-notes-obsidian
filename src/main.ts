@@ -222,8 +222,9 @@ export default class FleetingNotesPlugin extends Plugin {
 			// pull fleeting notes
 			let notes = await this.supabaseSync.getAllNotes();
 			notes = notes.filter((note: Note) => !note.deleted);
-      await this.fileSystemSync.upsertNotes(notes);
-			if (this.settings.sync_type == "one-way-delete") {
+      const deleteAfterSync = this.settings.sync_type == "one-way-delete"
+      await this.fileSystemSync.upsertNotes(notes, deleteAfterSync);
+			if (deleteAfterSync) {
         await this.deleteFleetingNotes(notes);
 			}
 			this.settings.last_sync_time = new Date();

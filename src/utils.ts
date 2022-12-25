@@ -117,7 +117,7 @@ export function convertObsidianPath(path: string) {
 }
 
 // fills the template with the note data
-export function getFilledTemplate(template: string, note: Note, {addDeleted = false}) {
+export function getFilledTemplate(template: string, note: Note, addDeleted = false) {
   const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
   let content = note.content;
   let tags: string[] = [];

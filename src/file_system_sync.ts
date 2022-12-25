@@ -43,7 +43,7 @@ class FileSystemSync {
 					var mdContent = getFilledTemplate(
             this.settings.note_template,
 						note,
-            { addDeleted }
+            addDeleted,
 					);
 					if (noteFile != null && (await this.vault.adapter.exists(noteFile.file.path))) {
 						// modify file if id exists in frontmatter
