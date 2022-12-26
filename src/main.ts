@@ -33,6 +33,7 @@ export interface Note {
 	modified_at?: string;
 	source?: string;
 	deleted?: boolean;
+  encrypted?: boolean;
 }
 
 export default class FleetingNotesPlugin extends Plugin {

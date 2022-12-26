@@ -2,6 +2,7 @@ import { Note } from "./main";
 var CryptoJS = require("crypto-js");
 import { moment } from "obsidian"
 import { InputModal, Values, ModalInputField } from "./components/inputModal";
+import { SupabaseNote } from "supabase_sync";
 
 export function openInputModal(
 	title: string,
@@ -30,7 +31,7 @@ export function throwError(e: any, errMessage: string) {
 	}
 }
 
-export const decryptNote = (note: any, key: string) => {
+export const decryptNote = (note: SupabaseNote, key: string) => {
 	if (note.encrypted) {
 		if (key === "") {
 			throwError(
@@ -47,11 +48,12 @@ export const decryptNote = (note: any, key: string) => {
 		if (note.source) {
 			note.source = decryptText(note.source, key);
 		}
+    note.encrypted = false;
 	}
-	return note as Note;
+	return note;
 };
 
-export const encryptNote = (note: any, key: string) => {
+export const encryptNote = (note: Note, key: string) => {
 	if (key !== "") {
 		if (note.title) {
 			note.title = encryptText(note.title, key);
@@ -64,7 +66,7 @@ export const encryptNote = (note: any, key: string) => {
 		}
 		note.encrypted = true;
 	}
-	return note as Note;
+	return note;
 };
 
 export const decryptText = (text: string, key: string) => {

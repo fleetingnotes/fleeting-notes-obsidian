@@ -8,7 +8,7 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpeGN3ZXlxd2txeXZlYnBtZHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NjQ4MDMyMTgsImV4cCI6MTk4MDM3OTIxOH0.awfZKRuaLOPzniEJ2CIth8NWPYnelLfsWrMWH2Bz3w8"
 );
 
-interface SupabaseNote {
+export interface SupabaseNote {
 	id: string;
 	title: string;
 	content: string;
@@ -28,6 +28,9 @@ class SupabaseSync {
   }
 
   isUpdateNoteSimilar(supaNote: SupabaseNote, updateNote: Note): boolean {
+    if (supaNote.encrypted) {
+      supaNote = decryptNote(supaNote, this.settings.encryption_key);
+    }
     // If updateNote property is empty, then we dont count it as being similar
     return (typeof updateNote.title !== 'string' || updateNote.title === supaNote.title) &&
     (typeof updateNote.content !== 'string' || updateNote.content === supaNote.content) && 
@@ -181,8 +184,11 @@ class SupabaseSync {
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'notes',
       }, (payload) => {
-        const note = payload.new as unknown as SupabaseNote
+        let note = payload.new as unknown as SupabaseNote
         if ([this.settings.supabaseId, this.settings.firebaseId].includes(note._partition)) {
+          if (note.encrypted) {
+            note = decryptNote(note, this.settings.encryption_key);
+          }
           handleNoteChange(note); 
         }
       })
