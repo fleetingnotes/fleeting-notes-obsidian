@@ -27,16 +27,34 @@ class SupabaseSync {
     this.settings = settings
   }
 
-  updateNotes = async (notes: any[]) => {
+  isUpdateNoteSimilar(supaNote: SupabaseNote, updateNote: Note): boolean {
+    // If updateNote property is empty, then we dont count it as being similar
+    return (typeof updateNote.title !== 'string' || updateNote.title === supaNote.title) &&
+    (typeof updateNote.content !== 'string' || updateNote.content === supaNote.content) && 
+    (typeof updateNote.source !== 'string' || updateNote.source === supaNote.source) && 
+    (typeof updateNote.deleted !== 'boolean' || updateNote.deleted === supaNote.deleted)
+  }
+
+  updateNote = async (note: Note) => {
+    await this.updateNotes([note]);
+  }
+
+  updateNotes = async (notes: Note[]) => {
     try {
       let supabaseNotes: SupabaseNote[] = [];
       let noteIds = new Set(notes.map((note) => note.id));
       // get all fields of the note
-      const res = await supabase
+      const query = supabase
         .from("notes")
         .select()
         .in("_partition", [this.settings.firebaseId, this.settings.supabaseId])
         .eq("deleted", false)
+      
+      // header size will be too big otherwise
+      if (noteIds.size < 100) {
+        query.in("id", [...noteIds])
+      }
+      const res = await query;
 
       if (res.error) {
         throwError(res.error, res.error.message);
@@ -44,12 +62,13 @@ class SupabaseSync {
       supabaseNotes = res.data;
 
       // only take notes that are modified after note from db & note exists
+      // and only take notes that are different then what's on cloud
       notes = notes.filter((note) => {
         let supabaseNote = res.data.find(
-          (supabaseNote: any) => 
+          (supabaseNote: SupabaseNote) => 
           supabaseNote.id === note.id && noteIds.has(supabaseNote.id)
         );
-        return (supabaseNote) ? true : false;
+        return (supabaseNote) ? !this.isUpdateNoteSimilar(supabaseNote, note) : false;
       });
 
       // merge possibly updated fields
@@ -153,6 +172,25 @@ class SupabaseSync {
       }
     });
     return supabase.auth.onAuthStateChange(callback);
+  }
+  onNoteChange = async (handleNoteChange: (note: SupabaseNote) => void) => {
+    if (!this.settings.supabaseId && !this.settings.firebaseId) return;
+    await this.removeAllChannels();
+    supabase
+      .channel('public:notes')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'notes',
+      }, (payload) => {
+        const note = payload.new as unknown as SupabaseNote
+        if ([this.settings.supabaseId, this.settings.firebaseId].includes(note._partition)) {
+          handleNoteChange(note); 
+        }
+      })
+      .subscribe();
+  }
+
+  removeAllChannels = async () => {
+    await supabase.removeAllChannels();
   }
 }
 

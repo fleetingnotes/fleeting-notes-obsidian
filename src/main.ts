@@ -27,12 +27,12 @@ export interface ObsidianNote {
 
 export interface Note {
 	id: string;
-	title: string;
-	content: string;
-	created_at: string;
-	modified_at: string;
-	source: string;
-	deleted: boolean;
+	title?: string;
+	content?: string;
+	created_at?: string;
+	modified_at?: string;
+	source?: string;
+	deleted?: boolean;
 }
 
 export default class FleetingNotesPlugin extends Plugin {
@@ -103,12 +103,27 @@ export default class FleetingNotesPlugin extends Plugin {
 
     /// init supabase sync
     this.supabaseSync = new SupabaseSync(this.settings);
+
+    // intialize realtime
+    this.initRealtime(this.settings.sync_type)
 	}
 	disableAutoSync() {
 		if (this.settings.sync_interval) {
 			clearInterval(this.settings.sync_interval);
 		}
 	}
+  
+  initRealtime(sync_type: string) {
+    if (sync_type === 'realtime-two-way') {
+      this.fileSystemSync.onNoteChange(this.supabaseSync.updateNote);
+      this.supabaseSync.onNoteChange((note) => this.fileSystemSync.upsertNotes([note]));
+    } else if (sync_type === 'realtime-one-way') {
+      this.supabaseSync.onNoteChange((note) => this.fileSystemSync.upsertNotes([note]));
+    } else {
+      this.fileSystemSync.offNoteChange();
+      this.supabaseSync.removeAllChannels();
+    }
+  }
 
   async reloginOnSignout(event: string) {
     if (event == "SIGNED_OUT") {
@@ -149,6 +164,8 @@ export default class FleetingNotesPlugin extends Plugin {
 	onunload() {
 		this.disableAutoSync();
     this.supabaseAuthSubscription?.unsubscribe();
+    this.fileSystemSync.offNoteChange();
+    this.supabaseSync.removeAllChannels();
 	}
 
 	async loadSettings() {
@@ -253,17 +270,7 @@ export default class FleetingNotesPlugin extends Plugin {
 		try {
 			var modifiedNotes = await this.getUpdatedLocalNotes();
 			var formattedNotes = await Promise.all(
-				modifiedNotes.map(async (note) => {
-					var { file, frontmatter, content } = note;
-					return {
-						id: frontmatter.id,
-						title: frontmatter.title ? frontmatter.title : "",
-						content: content || "",
-						source: frontmatter.source || "",
-						deleted: frontmatter.deleted || false,
-						modified_at: new Date(file.stat.mtime).toISOString(),
-					};
-				})
+				modifiedNotes.map(FileSystemSync.parseObsidianNote)
 			);
 			if (formattedNotes.length > 0) {
 				await this.supabaseSync.updateNotes(formattedNotes);

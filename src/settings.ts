@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	auto_generate_title: false,
 	fleeting_notes_folder: "FleetingNotesApp",
 	note_template:
-		'---\n# Metadata used for sync\nid: "${id}"\ntitle: "${title}"\n# Extracts all tags in content into the metadata\ntags: ${tags}\nsource: "${source}"\ncreated_date: "${created_date}"\nmodified_date: "${last_modified_date}"\n---\n${content}',
+		'---\n# Mandatory field\nid: "${id}"\n# Optional fields\ntitle: "${title}"\ntags: ${tags}\nsource: "${source}"\ncreated_date: "${created_date}"\nmodified_date: "${last_modified_date}"\n---\n${content}',
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
 	sync_type: "one-way",
@@ -181,26 +181,12 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 					"One-way sync (FN ⇒ Obsidian) + Delete from FN"
 				)
 				.addOption("two-way", "Two-way sync (FN ⇔ Obsidian)")
+				.addOption("realtime-one-way", "Realtime One-way sync (FN ⇔ Obsidian)")
+				.addOption("realtime-two-way", "Realtime Two-way sync (FN ⇔ Obsidian)")
 				.setValue(this.plugin.settings.sync_type)
 				.onChange(async (value) => {
 					this.plugin.settings.sync_type = value;
-					if (noteTemplateComponent) {
-						if (value == "two-way") {
-							this.plugin.settings.note_template =
-								DEFAULT_SETTINGS.note_template;
-							noteTemplateComponent.setValue(
-								DEFAULT_SETTINGS.note_template
-							);
-							noteTemplateComponent.inputEl.setAttr(
-								"disabled",
-								true
-							);
-						} else {
-							noteTemplateComponent.inputEl.removeAttribute(
-								"disabled"
-							);
-						}
-					}
+          this.plugin.initRealtime(value);
 					await this.plugin.saveSettings();
 				})
 		);

@@ -10,7 +10,6 @@ class FileSystemSync {
     string,
     ObsidianNote
   >();
-  renameRef: EventRef;
   modifyRef: EventRef;
   deleteRef: EventRef;
   
@@ -114,38 +113,41 @@ class FileSystemSync {
 		}
 
   }
-  onNoteChange = (modifyCallback: (notes: ObsidianNote[]) => void, deleteCallback: (notes: ObsidianNote[]) => void) => {
-    this.renameRef = this.vault.on("rename", (file, oldPath) => {
-      for (const k of this.existingNoteMap.keys()) {
-        const note = this.existingNoteMap.get(k);
-        if (note.file.path === oldPath) {
-          const tfile = file as TFile;
-          this.existingNoteMap.set(k, {
-            file: tfile,
-            frontmatter: note.frontmatter,
-            content: note.content,
-          })
-        }
-      }
-    })
+  onNoteChange = (handleNoteChange: (notes: Note) => void) => {
+    this.offNoteChange();
     this.deleteRef = this.vault.on("delete", (file) => {
       if (!this.fileInDir(file)) return
-      this.convertFileToNote(file as TFile).then((n) => {
-        deleteCallback([n]);
-      });
+      for (const k of this.existingNoteMap.keys()) {
+        const path = this.existingNoteMap.get(k)?.file.path
+        const noteId = this.existingNoteMap.get(k)?.frontmatter?.id;
+        if (noteId && path === file.path) {
+          return handleNoteChange({id: noteId, deleted: true});
+        }
+      }
     })
     this.modifyRef = this.vault.on("modify", (file) => {
       if (!this.fileInDir(file)) return
       this.convertFileToNote(file as TFile).then((n) => {
-        modifyCallback([n]);
+        handleNoteChange(FileSystemSync.parseObsidianNote(n));
       });
     })
   }
 
   offNoteChange = () => {
-    this.vault.offref(this.renameRef);
     this.vault.offref(this.deleteRef);
     this.vault.offref(this.modifyRef);
+  }
+
+  static parseObsidianNote = (note: ObsidianNote) : Note => {
+    var { file, frontmatter, content } = note;
+    return {
+      id: frontmatter.id,
+      title: frontmatter.title || undefined,
+      content: content || undefined,
+      source: frontmatter.source || undefined,
+      deleted: frontmatter.deleted || undefined,
+      modified_at: new Date(file.stat.mtime).toISOString(),
+    };
   }
 
   // helpers
