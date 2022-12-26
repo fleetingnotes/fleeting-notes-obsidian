@@ -56,14 +56,6 @@ export default class FleetingNotesPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "get-unprocessed-notes",
-			name: "Insert Unprocessed Notes",
-			callback: async () => {
-				this.insertUnprocessedNotes();
-			},
-		});
-
-		this.addCommand({
 			id: "insert-notes-containing",
 			name: "Insert All Notes Containing Specific Text",
 			callback: async () => {
@@ -178,26 +170,6 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-
-	async insertUnprocessedNotes() {
-		try {
-			const template = "- [ ] ![[${linkText}]]\n";
-			const unprocessedNotes = await this.getUnprocessedFleetingNotes();
-			const unprocessedNoteString = this.embedNotesToString(
-				unprocessedNotes,
-				this.app.workspace.getActiveFile().path,
-				template
-			);
-			this.appendStringToActiveFile(unprocessedNoteString);
-		} catch (e) {
-			if (typeof e === "string") {
-				new Notice(e);
-			} else {
-				console.error(e);
-				new Notice("Failed to insert unprocessed notes");
-			}
-		}
 	}
 
 	async embedNotesWithText(text: string) {
