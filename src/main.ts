@@ -257,7 +257,7 @@ export default class FleetingNotesPlugin extends Plugin {
 					var { file, frontmatter, content } = note;
 					return {
 						id: frontmatter.id,
-						title: frontmatter.title ? file.basename : "",
+						title: frontmatter.title ? frontmatter.title : "",
 						content: content || "",
 						source: frontmatter.source || "",
 						deleted: frontmatter.deleted || false,
