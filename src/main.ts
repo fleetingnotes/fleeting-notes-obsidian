@@ -306,48 +306,6 @@ export default class FleetingNotesPlugin extends Plugin {
 		return embedNotesString;
 	}
 
-	async getUnprocessedFleetingNotes(): Promise<ObsidianNote[]> {
-		let existingNotePathMap: Map<String, ObsidianNote> = this.fileSystemSync.existingNoteMap;
-		let skipNotesSet: Set<string> = new Set();
-
-		const resolvedLinks = this.app.metadataCache.resolvedLinks;
-		await Promise.all(
-			Object.keys(resolvedLinks).map(async (filePath) => {
-				// skip existing fleeting notes
-				if (existingNotePathMap.has(filePath)) return;
-				let linksInNote: Array<string> = [];
-				Object.keys(resolvedLinks[filePath]).forEach((linkInNote) => {
-					if (existingNotePathMap.has(linkInNote)) {
-						linksInNote.push(linkInNote);
-					}
-				});
-				if (linksInNote.length > 0) {
-					const file = (await this.app.vault.getAbstractFileByPath(
-						filePath
-					)) as TFile;
-					const content = await this.app.vault.read(file);
-					linksInNote.forEach(async (link) => {
-						const note: ObsidianNote =
-							existingNotePathMap.get(link);
-						const fullLink = note.file.path.replace(/\.\w+$/, "");
-						const re = new RegExp(
-							`^- \\[x\\] .*\\[\\[(${fullLink}|${note.file.basename})\\]\\]`,
-							"m"
-						);
-						if (content.match(re)) {
-							skipNotesSet.add(link);
-						}
-					});
-				}
-			})
-		);
-		const unprocessedNotes = [...existingNotePathMap.keys()].filter((k) => {
-      const path = existingNotePathMap.get(k)?.file.path;
-			return !skipNotesSet.has(path);
-		});
-		return unprocessedNotes.map((k) => existingNotePathMap.get(k));
-	}
-
 	async getNotesWithText(text: string) {
 		var existingNotes = await this.fileSystemSync.getAllNotes();
 		const textInMetaData = (note: ObsidianNote) => {
