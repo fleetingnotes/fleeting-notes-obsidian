@@ -11,7 +11,7 @@ class FileSystemSync {
     ObsidianNote
   >();
   modifyRef: EventRef;
-  // deleteRef: EventRef;
+  deleteRef: EventRef;
   
   constructor(vault: Vault, settings: FleetingNotesSettings) {
     this.vault = vault;
@@ -113,18 +113,20 @@ class FileSystemSync {
 		}
 
   }
-  onNoteChange = (handleNoteChange: (notes: Note) => void) => {
+  onNoteChange = (handleNoteChange: (notes: Note) => void, includeDelete = false) => {
     this.offNoteChange();
-    // this.deleteRef = this.vault.on("delete", (file) => {
-    //   if (!this.fileInDir(file)) return
-    //   for (const k of this.existingNoteMap.keys()) {
-    //     const path = this.existingNoteMap.get(k)?.file.path
-    //     const noteId = this.existingNoteMap.get(k)?.frontmatter?.id;
-    //     if (noteId && path === file.path) {
-    //       return handleNoteChange({id: noteId, deleted: true});
-    //     }
-    //   }
-    // })
+    if (includeDelete) {
+      this.deleteRef = this.vault.on("delete", (file) => {
+        if (!this.fileInDir(file)) return
+        for (const k of this.existingNoteMap.keys()) {
+          const path = this.existingNoteMap.get(k)?.file.path
+          const noteId = this.existingNoteMap.get(k)?.frontmatter?.id;
+          if (noteId && path === file.path) {
+            return handleNoteChange({id: noteId, deleted: true});
+          }
+        }
+      })
+    }
     this.modifyRef = this.vault.on("modify", (file) => {
       if (!this.fileInDir(file)) return
       this.convertFileToNote(file as TFile).then((n) => {
@@ -134,7 +136,7 @@ class FileSystemSync {
   }
 
   offNoteChange = () => {
-    // this.vault.offref(this.deleteRef);
+    this.vault.offref(this.deleteRef);
     this.vault.offref(this.modifyRef);
   }
 
