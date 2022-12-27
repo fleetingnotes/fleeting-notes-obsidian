@@ -28,14 +28,15 @@ class SupabaseSync {
   }
 
   isUpdateNoteSimilar(supaNote: SupabaseNote, updateNote: Note): boolean {
-    if (supaNote.encrypted) {
-      supaNote = decryptNote(supaNote, this.settings.encryption_key);
+    let tempSupaNote = {...supaNote} as SupabaseNote;
+    if (tempSupaNote.encrypted) {
+      tempSupaNote = decryptNote(tempSupaNote, this.settings.encryption_key);
     }
     // If updateNote property is empty, then we dont count it as being similar
-    return (typeof updateNote.title !== 'string' || updateNote.title === supaNote.title) &&
-    (typeof updateNote.content !== 'string' || updateNote.content === supaNote.content) && 
-    (typeof updateNote.source !== 'string' || updateNote.source === supaNote.source) && 
-    (typeof updateNote.deleted !== 'boolean' || updateNote.deleted === supaNote.deleted)
+    return (typeof updateNote.title !== 'string' || updateNote.title === tempSupaNote.title) &&
+    (typeof updateNote.content !== 'string' || updateNote.content === tempSupaNote.content) && 
+    (typeof updateNote.source !== 'string' || updateNote.source === tempSupaNote.source) && 
+    (typeof updateNote.deleted !== 'boolean' || updateNote.deleted === tempSupaNote.deleted)
   }
 
   updateNote = async (note: Note) => {
