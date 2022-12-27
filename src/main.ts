@@ -111,6 +111,7 @@ export default class FleetingNotesPlugin extends Plugin {
       this.fileSystemSync.onNoteChange(this.supabaseSync.updateNote);
       this.supabaseSync.onNoteChange((note) => this.fileSystemSync.upsertNotes([note]));
     } else if (sync_type === 'realtime-one-way') {
+      this.fileSystemSync.offNoteChange();
       this.supabaseSync.onNoteChange((note) => this.fileSystemSync.upsertNotes([note]));
     } else {
       this.fileSystemSync.offNoteChange();
