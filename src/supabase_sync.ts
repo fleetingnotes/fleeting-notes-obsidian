@@ -112,7 +112,7 @@ class SupabaseSync {
   getAllNotes = async () => {
     let notes: Note[] = [];
     try {
-      if (!this.settings.firebaseId) {
+      if (!this.settings.firebaseId && !this.settings.supabaseId) {
         throwError(
           "Fleeting Notes Sync Failed - Please Log In",
           "Fleeting Notes Sync Failed - Please Log In"
