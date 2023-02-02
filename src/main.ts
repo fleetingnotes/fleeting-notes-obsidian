@@ -219,6 +219,11 @@ export default class FleetingNotesPlugin extends Plugin {
         await this.deleteFleetingNotes(notes);
 			}
 			this.settings.last_sync_time = new Date();
+      // syncs links with Fleeting Notes
+      if (this.settings.sync_obsidian_links) {
+        this.syncObsidianLinks();
+      }
+      
       return true;
 		} catch (e) {
 			if (typeof e === "string") {
@@ -239,7 +244,6 @@ export default class FleetingNotesPlugin extends Plugin {
 		doc.replaceSelection(content);
 	}
 
-	// writes fleeting notes to firebase
 	async pushFleetingNotes() {
 		try {
 			var modifiedNotes = await this.getUpdatedLocalNotes();
@@ -257,6 +261,23 @@ export default class FleetingNotesPlugin extends Plugin {
 			);
 		}
 	}
+
+  async syncObsidianLinks() {
+    try {
+      let note = await this.supabaseSync.getNoteByTitle(this.settings.sync_obsidian_links_title);
+      if (!note) {
+        note = await this.supabaseSync.createEmptyNote();
+      }
+      const allLinks = this.getAllLinks();
+      const allLinksStr = allLinks.map((link) => `[[${link}]]`).join(" ");
+      note.title = this.settings.sync_obsidian_links_title;
+      note.content = allLinksStr;
+      await this.supabaseSync.updateNote(note);
+      return true;
+    } catch (e) {
+      throwError(e, "Failed to push Obsidian [[links]] to Fleeting Notes")
+    }
+  }
 
 	async deleteFleetingNotes(notes: Note[]) {
 		try {
