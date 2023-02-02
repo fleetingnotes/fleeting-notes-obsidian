@@ -1,4 +1,5 @@
 import { AuthResponse, createClient } from "@supabase/supabase-js";
+import { v4 as uuidv4 } from 'uuid';
 import { Note } from "main";
 import { FleetingNotesSettings } from "settings";
 import { decryptNote, encryptNote, throwError } from "utils";
@@ -109,6 +110,34 @@ class SupabaseSync {
     }
   }
 
+  createEmptyNote = async () => {
+    const emptyNote = {
+      id: uuidv4(),
+      title: '',
+      content: '',
+      source: '',
+      created_at: new Date().toISOString(),
+      modified_at: new Date().toISOString(),
+      deleted: false,
+      shared: false,
+      encrypted: false,
+      _partition: this.settings.supabaseId,
+    } as SupabaseNote;
+    await supabase.from('notes').insert(emptyNote)
+    return emptyNote;
+  }
+
+  getNoteByTitle = async (title: string) => {
+    const res = await supabase.from("notes").select()
+      .eq("title", title)
+      .eq("deleted", false)
+    let note = null;
+    if (res.data && res.data.length > 0) {
+      note = decryptNote(res.data[0], this.settings.encryption_key)
+    }
+    return note as Note | null;
+  }
+
   getAllNotes = async () => {
     let notes: Note[] = [];
     try {
@@ -118,12 +147,15 @@ class SupabaseSync {
           "Fleeting Notes Sync Failed - Please Log In"
         );
       }
-      await supabase
+      let query = supabase
         .from("notes")
         .select()
         .filter("_partition", "in", `(${this.settings.firebaseId},${this.settings.supabaseId})`)
-        .filter("deleted", "eq", false)
-        .then((res) => {
+        .filter("deleted", "eq", false);
+      if (this.settings.sync_obsidian_links) {
+        query.neq("title", this.settings.sync_obsidian_links_title);
+      }
+      await query.then((res) => {
           if (res.error) {
             throwError(res.error, res.error.message);
           }

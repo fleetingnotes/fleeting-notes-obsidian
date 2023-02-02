@@ -17,6 +17,8 @@ export interface FleetingNotesSettings {
 	notes_filter: string;
 	sync_on_startup: boolean;
 	last_sync_time: Date;
+  sync_obsidian_links: boolean;
+  sync_obsidian_links_title: string;
 	firebaseId: string | undefined;
 	supabaseId: string | undefined;
   email: string | undefined;
@@ -33,6 +35,8 @@ export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
 	sync_type: "one-way",
+  sync_obsidian_links: false,
+  sync_obsidian_links_title: "Links from Obsidian",
 	notes_filter: "",
   email: undefined,
   password: undefined,
@@ -234,18 +238,22 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Copy Links to Clipboard")
-			.setDesc("Copy all Obsidian links to your clipboard")
-			.addButton((button) => {
-				button
-					.setTooltip("Copy links to clipboard")
-					.setIcon("copy")
-					.onClick(() => {
-						const allLinks = this.plugin.getAllLinks();
-						const allLinksStr = allLinks
-							.map((link) => `[[${link}]]`)
-							.join(" ");
-						navigator.clipboard.writeText(allLinksStr);
+			.setName("Sync Obsidian [[links]] to Fleeting Notes")
+			.setDesc(`The note titled "${this.plugin.settings.sync_obsidian_links_title}" will be overwritten in the Fleeting Notes app`)
+			.addToggle((tog) => {
+				tog
+					.setValue(this.plugin.settings.sync_obsidian_links)
+					.onChange(async (val) => {
+            if (val) {
+              const ok = await this.plugin.syncObsidianLinks();
+              if (ok) {
+                this.plugin.settings.sync_obsidian_links = val;
+                await this.plugin.saveSettings();
+              }
+            } else {
+              this.plugin.settings.sync_obsidian_links = val;
+              await this.plugin.saveSettings();
+            }
 					});
 			});
 	}
