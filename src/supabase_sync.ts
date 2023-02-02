@@ -218,6 +218,9 @@ class SupabaseSync {
         event: '*', schema: 'public', table: 'notes',
       }, (payload) => {
         let note = payload.new as unknown as SupabaseNote
+        if (this.settings.sync_obsidian_links && note.title === this.settings.sync_obsidian_links_title) {
+          return;
+        }
         if ([this.settings.supabaseId, this.settings.firebaseId].includes(note._partition)) {
           if (note.encrypted) {
             note = decryptNote(note, this.settings.encryption_key);
