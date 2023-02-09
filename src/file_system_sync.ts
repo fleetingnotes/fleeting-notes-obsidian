@@ -45,9 +45,13 @@ class FileSystemSync {
             addDeleted,
 					);
 					if (noteFile != null && (await this.vault.adapter.exists(noteFile.file.path))) {
-						// modify file if id exists in frontmatter
-						await this.vault.modify(noteFile.file, mdContent);
-						await this.vault.rename(noteFile.file, path);
+            // check if file contents are the same
+            var oldMdContent = await this.vault.read(noteFile.file)
+            if (oldMdContent != mdContent) {
+              // modify file if id exists in frontmatter
+              await this.vault.modify(noteFile.file, mdContent);
+            }
+            await this.vault.rename(noteFile.file, path);
 					} else {
 						// recreate file otherwise
 						var delFile =
