@@ -117,11 +117,11 @@ class FileSystemSync {
 		}
 
   }
-  onNoteChange = (handleNoteChange: (notes: Note) => void, includeDelete = false) => {
+  onNoteChange = (handleNoteChange: (notes: Note) => void, includeDelete = true) => {
     this.offNoteChange();
     if (includeDelete) {
       this.deleteRef = this.vault.on("delete", (file) => {
-        if (!this.fileInDir(file)) return
+        if (!this.fileInDir(file)) return;
         for (const k of this.existingNoteMap.keys()) {
           const path = this.existingNoteMap.get(k)?.file.path
           const noteId = this.existingNoteMap.get(k)?.frontmatter?.id;
@@ -129,14 +129,14 @@ class FileSystemSync {
             return handleNoteChange({id: noteId, deleted: true});
           }
         }
-      })
+      });
     }
     this.modifyRef = this.vault.on("modify", (file) => {
-      if (!this.fileInDir(file)) return
+      if (!this.fileInDir(file)) return;
       this.convertFileToNote(file as TFile).then((n) => {
         handleNoteChange(FileSystemSync.parseObsidianNote(n));
       });
-    })
+    });
   }
 
   offNoteChange = () => {
