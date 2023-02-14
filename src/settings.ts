@@ -177,15 +177,17 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl).setName("Sync type:").addDropdown((dropdown) =>
+		new Setting(containerEl)
+      .setName("Sync type")
+      .setDesc('Warning: Deleting a note in Obsidian results in its removal from FN with two-way sync')
+      .addDropdown((dropdown) =>
 			dropdown
 				.addOption("one-way", "One-way sync (FN ⇒ Obsidian)")
 				.addOption(
 					"one-way-delete",
 					"One-way sync (FN ⇒ Obsidian) + Delete from FN"
 				)
-				.addOption("two-way", "Two-way sync (FN ⇔ Obsidian)")
-				.addOption("realtime-one-way", "Realtime One-way sync (FN ⇔ Obsidian)")
+				.addOption("realtime-one-way", "Realtime One-way sync (FN ⇒ Obsidian)")
 				.addOption("realtime-two-way", "Realtime Two-way sync (FN ⇔ Obsidian)")
 				.setValue(this.plugin.settings.sync_type)
 				.onChange(async (value) => {
