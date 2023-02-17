@@ -57,6 +57,19 @@ export default class FleetingNotesPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "create-empty-fleeting-note",
+			name: "Create Empty Fleeting Note",
+			callback: async () => {
+        try {
+          await this.createEmptyFleetingNote();
+        } catch (e) {
+          console.error(e);
+          new Notice("Failed to create a Fleeting Note :(")
+        }
+			},
+		});
+
+		this.addCommand({
 			id: "insert-notes-containing",
 			name: "Insert All Notes Containing Specific Text",
 			callback: async () => {
@@ -296,6 +309,13 @@ export default class FleetingNotesPlugin extends Plugin {
 			throwError(e, "Failed to delete notes from Fleeting Notes");
 		}
 	}
+
+  async createEmptyFleetingNote() {
+    const note = await this.supabaseSync.createEmptyNote();
+    await this.fileSystemSync.upsertNotes([note]);
+    const obsNote = this.fileSystemSync.existingNoteMap.get(note.id);
+    this.app.workspace.activeLeaf.openFile(obsNote.file);
+  }
 
 	// returns a list of files that have been modified since the last sync
 	async getUpdatedLocalNotes() {

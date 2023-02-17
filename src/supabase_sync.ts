@@ -123,7 +123,10 @@ class SupabaseSync {
       encrypted: false,
       _partition: this.settings.supabaseId,
     } as SupabaseNote;
-    await supabase.from('notes').insert(emptyNote)
+    const { error } = await supabase.from('notes').insert(emptyNote)
+    if (error) {
+      throw error;
+    }
     return emptyNote;
   }
 
