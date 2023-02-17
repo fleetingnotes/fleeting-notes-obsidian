@@ -1,0 +1,25 @@
+name: publish
+on:
+  release:
+    types: [published]
+jobs:
+  publish-discord:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@0.3.2
+        with:
+          args: |
+            🎉 Obsidian Plugin ${{ github.event.release.tag_name }} Release Announcement 🎉
+
+            This update includes the following features and improvements:
+            ${{ github.event.release.html_url }}
+
+            ${{ github.event.release.body }}
+
+            You can download the latest version within Obsidian. I hope you enjoy these new additions and please let me know if you have any feedback!
+
+            Thank you for your continued support!
+            - Matt
