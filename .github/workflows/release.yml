@@ -22,4 +22,5 @@ jobs:
               uses: ncipollo/release-action@v1.7.3
               with:
                   artifacts: "main.js,manifest.json,styles.css"
+                  draft: true
                   token: ${{ secrets.GITHUB_TOKEN }}
