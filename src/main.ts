@@ -113,6 +113,7 @@ export default class FleetingNotesPlugin extends Plugin {
     // intialize realtime
     this.initRealtime(this.settings.sync_type)
 	}
+
 	disableAutoSync() {
 		if (this.settings.sync_interval) {
 			clearInterval(this.settings.sync_interval);
@@ -122,10 +123,10 @@ export default class FleetingNotesPlugin extends Plugin {
   initRealtime(sync_type: string) {
     if (sync_type === 'realtime-two-way') {
       this.fileSystemSync.onNoteChange(this.supabaseSync.updateNote);
-      this.supabaseSync.onNoteChange((note) => this.fileSystemSync.upsertNotes([note]));
+      this.supabaseSync.onNoteChange((note) => (note.deleted) ? this.fileSystemSync.deleteNotes([note]) : this.fileSystemSync.upsertNotes([note]));
     } else if (sync_type === 'realtime-one-way') {
       this.fileSystemSync.offNoteChange();
-      this.supabaseSync.onNoteChange((note) => this.fileSystemSync.upsertNotes([note]));
+      this.supabaseSync.onNoteChange((note) => (note.deleted) ? this.fileSystemSync.deleteNotes([note]) : this.fileSystemSync.upsertNotes([note]));
     } else {
       this.fileSystemSync.offNoteChange();
       this.supabaseSync.removeAllChannels();

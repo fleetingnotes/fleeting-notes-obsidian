@@ -115,8 +115,8 @@ class FileSystemSync {
 		} catch (e) {
 			throwError(e, "Failed to delete notes from Fleeting Notes");
 		}
-
   }
+
   onNoteChange = (handleNoteChange: (notes: Note) => void, includeDelete = true) => {
     this.offNoteChange();
     if (includeDelete) {
