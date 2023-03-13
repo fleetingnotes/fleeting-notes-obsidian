@@ -32,6 +32,9 @@ export interface Note {
 	created_at?: string;
 	modified_at?: string;
 	source?: string;
+  source_title?: string;
+  source_description?: string;
+  source_image_url?: string;
 	deleted?: boolean;
   encrypted?: boolean;
 }
