@@ -48,6 +48,15 @@ export const decryptNote = (note: SupabaseNote, key: string) => {
 		if (note.source) {
 			note.source = decryptText(note.source, key);
 		}
+		if (note.source_title) {
+			note.source_title = decryptText(note.source_title, key);
+		}
+		if (note.source_description) {
+			note.source_description = decryptText(note.source_description, key);
+		}
+		if (note.source_image_url) {
+			note.source_image_url = decryptText(note.source_image_url, key);
+		}
     note.encrypted = false;
 	}
 	return note;
@@ -64,6 +73,7 @@ export const encryptNote = (note: Note, key: string) => {
 		if (note.source) {
 			note.source = encryptText(note.source, key);
 		}
+    // Don't encrypt source metadata unless you want to sync it as well!
 		note.encrypted = true;
 	}
 	return note;
@@ -127,15 +137,22 @@ export function getFilledTemplate(template: string, note: Note, addDeleted = fal
     tags = extractAllTags(note.content);
   }
   if (metadataMatch) {
-    const escapedTitle = note.title.replace(/\"/g, '\\"');
-    const escapedContent = content.replace(/\"/g, '\\"');
-    const escapedSource = note.source.replace(/\"/g, '\\"');
+    const escapeForYaml = (text?: string) => (text || '').replace(/\"/g, '\\"').replace(/\n/, " ");
+    const escapedTitle = escapeForYaml(note.title);
+    const escapedContent = escapeForYaml(content);
+    const escapedSource = escapeForYaml(note.source);
+    const escapedSourceTitle = escapeForYaml(note.source_title);
+    const escapedSourceDescription = escapeForYaml(note.source_description);
+    const escapedSourceImageUrl = escapeForYaml(note.source_image_url);
     const escapedTags = `[${tags.join(", ")}]`;
     var newMetadata = metadataMatch[1]
       .replace(/\$\{title\}/gm, escapedTitle)
       .replace(/\$\{tags\}/gm, escapedTags)
       .replace(/\$\{content\}/gm, escapedContent)
-      .replace(/\$\{source\}/gm, escapedSource);
+      .replace(/\$\{source\}/gm, escapedSource)
+      .replace(/\$\{source_title\}/gm, escapedSourceTitle)
+      .replace(/\$\{source_description\}/gm, escapedSourceDescription)
+      .replace(/\$\{source_image_url\}/gm, escapedSourceImageUrl);
     if (addDeleted) {
       const deleted_match = newMetadata.match(/^deleted:.*$/);
       if (deleted_match) {
@@ -164,7 +181,10 @@ export function getFilledTemplate(template: string, note: Note, addDeleted = fal
       moment(note.modified_at).local().format("YYYY-MM-DD")
     )
     .replace(/\$\{content\}/gm, content)
-    .replace(/\$\{source\}/gm, note.source);
+    .replace(/\$\{source\}/gm, note.source)
+    .replace(/\$\{source_title\}/gm, note.source_title || '')
+    .replace(/\$\{source_description\}/gm, note.source_description || '')
+    .replace(/\$\{source_image_url\}/gm, note.source_image_url || '');
 
   return newTemplate;
 }

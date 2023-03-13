@@ -31,7 +31,20 @@ export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	auto_generate_title: false,
 	fleeting_notes_folder: "FleetingNotesApp",
 	note_template:
-		'---\n# Mandatory field\nid: "${id}"\n# Optional fields\ntitle: "${title}"\ntags: ${tags}\nsource: "${source}"\ncreated_date: "${created_date}"\nmodified_date: "${last_modified_date}"\n---\n${content}',
+`---
+# Mandatory fields
+id: "\${id}"
+# Optional fields
+title: "\${title}"
+tags: \${tags}
+source: "\${source}"
+source_title: "\${source_title}"
+source_description: "\${source_description}"
+source_image_url: "\${source_image_url}"
+created_date: "\${created_date}"
+modified_date: "\${last_modified_date}"
+---
+\${content}`,
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
 	sync_type: "one-way",

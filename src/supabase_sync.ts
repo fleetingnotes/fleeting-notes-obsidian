@@ -14,6 +14,9 @@ export interface SupabaseNote {
 	title: string;
 	content: string;
 	source: string;
+  source_title?: string;
+  source_description?: string;
+  source_image_url?: string;
 	created_at: string;
 	modified_at: string;
 	deleted: boolean;
