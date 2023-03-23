@@ -92,7 +92,7 @@ export const encryptText = (text: string, key: string) => {
 
 export const extractAllTags = (text: string): string[] => {
 	let tags = [];
-	let tagRegex = /(^|\B)#(?![0-9_]+\b)([a-zA-Z0-9_]{1,30})(\b|\r)/gm;
+	let tagRegex = /(^|\B)#(?![0-9_]+\b)([a-zA-Z0-9_\/]{1,50})(\b|\r)/gm;
 	//get all tags, and when adding a tag, remove # and add quotation marks, using matchall
 	let matches = text.matchAll(tagRegex);
 	for (const match of matches) {
@@ -137,7 +137,7 @@ export function getFilledTemplate(template: string, note: Note, addDeleted = fal
     tags = extractAllTags(note.content);
   }
   if (metadataMatch) {
-    const escapeForYaml = (text?: string) => (text || '').replace(/\"/g, '\\"').replace(/\n/, " ");
+    const escapeForYaml = (text?: string) => (text || '').replace(/\"/g, '\\"').replace(/\n/, " ").replace("\\", "\\\\");
     const escapedTitle = escapeForYaml(note.title);
     const escapedContent = escapeForYaml(content);
     const escapedSource = escapeForYaml(note.source);
