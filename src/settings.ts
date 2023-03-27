@@ -25,6 +25,7 @@ export interface FleetingNotesSettings {
   password: string | undefined;
 	encryption_key: string;
 	sync_interval: NodeJS.Timer | undefined;
+	date_format: string;
 }
 
 export const DEFAULT_SETTINGS: FleetingNotesSettings = {
@@ -57,6 +58,7 @@ modified_date: "\${last_modified_date}"
 	supabaseId: undefined,
 	encryption_key: "",
 	sync_interval: undefined,
+	date_format: 'YYYY-MM-DD'
 };
 export class FleetingNotesSettingsTab extends PluginSettingTab {
 	plugin: FleetingNotesPlugin;
@@ -158,20 +160,6 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl)
-			.setName("Notes filter text")
-			.setDesc(
-				"Notes will only be imported if the title/content includes the text"
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("ex. #work")
-					.setValue(this.plugin.settings.notes_filter)
-					.onChange(async (value) => {
-						this.plugin.settings.notes_filter = value;
-						await this.plugin.saveSettings();
-					})
-			);
 
 		new Setting(containerEl)
 			.setName("Sync notes automatically")
@@ -210,6 +198,8 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 				})
 		);
 
+		containerEl.createEl("h2", { text: "Note Templating Options" });
+
 		new Setting(containerEl)
 			.setName("Note Template")
 			.setDesc("Only editable in one-way sync");
@@ -239,7 +229,19 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 						this.display();
 					});
 			});
+		new Setting(containerEl)
+			.setName("Date format")
+			.setDesc("Affected variables: created_date, last_modified_date. For more formatting options, see: https://momentjs.com/docs/#/displaying/")
+			.addText((text) =>
+				text
+					.setPlaceholder("Enter date format")
+					.setValue(this.plugin.settings.date_format)
+					.onChange(async (value) => {
+						this.plugin.settings.date_format = value;
+						await this.plugin.saveSettings();
+					}));
 
+		containerEl.createEl("h2", { text: "Other Settings" });
 		new Setting(containerEl)
 			.setName("Auto-generate note title")
 			.setDesc("Will generate based on note content")
@@ -253,8 +255,23 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Notes filter text")
+			.setDesc(
+				"Notes will only be imported if the title/content includes the text"
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("ex. #work")
+					.setValue(this.plugin.settings.notes_filter)
+					.onChange(async (value) => {
+						this.plugin.settings.notes_filter = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("Sync Obsidian [[links]] to Fleeting Notes")
-			.setDesc(`The note titled "${this.plugin.settings.sync_obsidian_links_title}" will be overwritten in the Fleeting Notes app`)
+.setDesc(`The note titled "${this.plugin.settings.sync_obsidian_links_title}" will be overwritten in the Fleeting Notes app. If you have a lot of links avoid opening the "Links from Obsidian" in Fleeting Notes as it may crash the app.`)
 			.addToggle((tog) => {
 				tog
 					.setValue(this.plugin.settings.sync_obsidian_links)

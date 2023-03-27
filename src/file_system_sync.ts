@@ -43,6 +43,7 @@ class FileSystemSync {
             this.settings.note_template,
 						note,
             addDeleted,
+            this.settings.date_format,
 					);
 					if (noteFile != null && (await this.vault.adapter.exists(noteFile.file.path))) {
             // check if file contents are the same
