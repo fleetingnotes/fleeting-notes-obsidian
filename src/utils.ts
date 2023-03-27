@@ -102,23 +102,17 @@ export const extractAllTags = (text: string): string[] => {
 };
 export const getDefaultNoteTitle = (
 	note: Note,
-	existingTitles: Set<string>,
 	autoGenerateTitle: boolean
 ) => {
-  const titleFromContent = note.content
-    .substring(0, 40)
-    .replace(/[\n\r]/g, ' ')
+  const escapeTitle = (t: string | null) => (t || '')
+		.substring(0, 40)
+		.replace(/[\n\r]/g, ' ')
     .replace(/([\[\]\#\*\:\/\\\^\.])/g, "");
-	if (!autoGenerateTitle || titleFromContent.length === 0) {
-		return `${note.id}.md`;
-	}
-  let tempTitle = titleFromContent;
-  let i = 1;
-  while (existingTitles.has(`${tempTitle}.md`)) {
-    tempTitle = `${titleFromContent} (${i})`;
-    i++;
+  const titleFromContent = escapeTitle(note.content) || escapeTitle(note.source_title);
+  if (!autoGenerateTitle || titleFromContent.length === 0) {
+		return `${note.id}.md`			
   }
-  return `${tempTitle}.md`;
+  return `${titleFromContent}.md`;
 };
 
 // paths in obsidian are weird, need function to convert to proper path

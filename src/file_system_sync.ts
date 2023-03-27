@@ -36,7 +36,7 @@ class FileSystemSync {
       })
 			for (var i = 0; i < notes.length; i++) {
 				var note = notes[i];
-        const path = this.getNotePath(note, this.settings.auto_generate_title);
+        const path = this.getNotePath(this.vault, note, this.settings.auto_generate_title);
 				try {
 					var noteFile = this.existingNoteMap.get(note.id) || null;
 					var mdContent = getFilledTemplate(
@@ -158,19 +158,23 @@ class FileSystemSync {
   }
 
   // helpers
-  getNotePath = (note: Note, titleFromContent: boolean): string => {
-    var filenamesInFolder = this.getFilenamesInFolder(this.dirPath());
+  getNotePath = (vault: Vault, note: Note, autoGenerateTitle: boolean): string => {
     var noteFileName = note.title
       ? `${note.title}.md`
       : getDefaultNoteTitle(
           note,
-          filenamesInFolder,
-          titleFromContent,
+          autoGenerateTitle,
         );
     // update existing titles
     var path = convertObsidianPath(pathJoin([this.dirPath(), noteFileName]));
     if (!path.includes(".md")) {
       path = path + ".md";
+    }
+
+    let count = 0;
+    while (vault.getAbstractFileByPath(path) != null) {
+      count += 1;
+      path = path.replace(/( \([\d]+\))?\.([^/.]+)$/, ` (${count}).$2`); 
     }
     return path
   }
