@@ -129,7 +129,7 @@ export function convertObsidianPath(path: string) {
 }
 
 // fills the template with the note data
-export function getFilledTemplate(template: string, note: Note, addDeleted = false) {
+export function getFilledTemplate(template: string, note: Note, addDeleted = false, dateFormat = 'YYYY-MM-DD') {
   const metadataMatch = template.match(/^---\n([\s\S]*?)\n---\n/m);
   let content = note.content;
   let tags: string[] = [];
@@ -174,11 +174,11 @@ export function getFilledTemplate(template: string, note: Note, addDeleted = fal
     .replace(/\$\{tags\}/gm, `[${tags.join(", ")}]`)
     .replace(
       /\$\{created_date\}/gm,
-      moment(note.created_at).local().format("YYYY-MM-DD")
+      moment(note.created_at).local().format(dateFormat)
     )
     .replace(
       /\$\{last_modified_date\}/gm,
-      moment(note.modified_at).local().format("YYYY-MM-DD")
+      moment(note.modified_at).local().format(dateFormat)
     )
     .replace(/\$\{content\}/gm, content)
     .replace(/\$\{source\}/gm, note.source)
