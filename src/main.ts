@@ -95,13 +95,6 @@ export default class FleetingNotesPlugin extends Plugin {
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FleetingNotesSettingsTab(this.app, this));
 
-		// syncs on startup
-		if (this.settings.sync_on_startup) {
-			// Files might not be loaded yet
-			this.app.workspace.onLayoutReady(() => {
-				this.autoSync();
-			});
-		}
     // listen for auth state changes
     const { data } = await SupabaseSync.onAuthStateChange(this.reloginOnSignout);
     this.supabaseAuthSubscription = data.subscription;
@@ -115,6 +108,14 @@ export default class FleetingNotesPlugin extends Plugin {
 
     // intialize realtime
     this.initRealtime(this.settings.sync_type)
+
+		// syncs on startup
+		if (this.settings.sync_on_startup) {
+			// Files might not be loaded yet
+			this.app.workspace.onLayoutReady(() => {
+				this.autoSync();
+			});
+		}
 	}
 
 	disableAutoSync() {
