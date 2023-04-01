@@ -101,7 +101,6 @@ export default class FleetingNotesPlugin extends Plugin {
 
     // init filesystem sync
     this.fileSystemSync = new FileSystemSync(this.app.vault, this.settings);
-    await this.fileSystemSync.init()
 
     /// init supabase sync
     this.supabaseSync = new SupabaseSync(this.settings);
@@ -110,12 +109,13 @@ export default class FleetingNotesPlugin extends Plugin {
     this.initRealtime(this.settings.sync_type)
 
 		// syncs on startup
-		if (this.settings.sync_on_startup) {
-			// Files might not be loaded yet
-			this.app.workspace.onLayoutReady(() => {
+		// Files might not be loaded yet
+		this.app.workspace.onLayoutReady(async () => {
+			await this.fileSystemSync.init();
+			if (this.settings.sync_on_startup) {
 				this.autoSync();
-			});
-		}
+			}
+		});
 	}
 
 	disableAutoSync() {
