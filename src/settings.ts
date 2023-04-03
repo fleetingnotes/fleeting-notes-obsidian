@@ -12,6 +12,7 @@ import SupabaseSync from "supabase_sync";
 export interface FleetingNotesSettings {
 	auto_generate_title: boolean;
 	fleeting_notes_folder: string;
+  attachments_folder: string;
 	note_template: string;
 	sync_type: string;
 	notes_filter: string;
@@ -31,6 +32,7 @@ export interface FleetingNotesSettings {
 export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	auto_generate_title: false,
 	fleeting_notes_folder: "FleetingNotesApp",
+  attachments_folder: "",
 	note_template:
 `---
 # Mandatory fields
@@ -147,19 +149,31 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 
 		containerEl.createEl("h2", { text: "Sync Settings" });
 
-		new Setting(containerEl)
-			.setName("Fleeting Notes folder location")
-			.setDesc("Files will be populated here from Fleeting Notes")
-			.addText((text) =>
-				text
-					.setPlaceholder("Enter the folder location")
-					.setValue(this.plugin.settings.fleeting_notes_folder)
-					.onChange(async (value) => {
-						this.plugin.settings.fleeting_notes_folder = value;
-						await this.plugin.saveSettings();
-					})
-			);
+    new Setting(containerEl)
+      .setName("Notes folder location")
+      .setDesc("Notes will be populated here")
+      .addText((text) =>
+        text
+          .setPlaceholder("Enter the folder location")
+          .setValue(this.plugin.settings.fleeting_notes_folder)
+          .onChange(async (value) => {
+            this.plugin.settings.fleeting_notes_folder = value;
+            await this.plugin.saveSettings();
+          })
+      );
 
+    new Setting(containerEl)
+      .setName("Attachments folder location")
+      .setDesc("Attachments will be populated here")
+      .addText((text) =>
+        text
+          .setPlaceholder("Enter the folder location")
+          .setValue(this.plugin.settings.attachments_folder)
+          .onChange(async (value: string) => {
+            this.plugin.settings.attachments_folder = value;
+            await this.plugin.saveSettings();
+          })
+      );
 
 		new Setting(containerEl)
 			.setName("Sync notes automatically")

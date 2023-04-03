@@ -1,5 +1,5 @@
 import { Note, ObsidianNote } from "main"
-import { TFile, Vault, parseYaml, TAbstractFile, EventRef, Setting } from "obsidian"
+import { TFile, Vault, parseYaml, TAbstractFile, EventRef, requestUrl } from "obsidian"
 import { FleetingNotesSettings } from "settings";
 import { convertObsidianPath, getDefaultNoteTitle, getFilledTemplate, pathJoin, throwError } from "utils";
 
@@ -34,6 +34,17 @@ class FileSystemSync {
           this.vault.createFolder(this.dirPath());
         }
       })
+      if (this.settings.attachments_folder) {
+        await this.vault.adapter.exists(this.settings.attachments_folder).then(
+          (exists) => {
+            if (!exists) {
+              this.vault.createFolder(
+                convertObsidianPath(this.settings.attachments_folder),
+              );
+            }
+          },
+        );
+      }
 			for (var i = 0; i < notes.length; i++) {
 				var note = notes[i];
         const path = this.getNotePath(this.vault, note, this.settings.auto_generate_title);
@@ -67,6 +78,8 @@ class FileSystemSync {
               content,
             })
 					}
+          // download source
+          this.downloadSource(note, this.settings.attachments_folder);
 				} catch (e) {
 					throwError(
 						e,
@@ -78,6 +91,31 @@ class FileSystemSync {
 			throwError(e, "Failed to write notes to Obsidian");
 		}
   }
+
+  downloadSource = async (note: Note, folder: string) : Promise<void> => {
+    try {
+      const re = /^https:\/\/\w+\.supabase\.co\/storage\/.+$/;
+      if (!(re.test(note.source) && this.settings.attachments_folder)) return;
+      const ext = note.source.split(".").pop();
+      let filename = note.id
+      if (note.title) {
+        filename = (note.title.endsWith(`.${ext}`)) ? note.title : `${note.title}.${ext}`;
+      }
+      const path = pathJoin([folder, filename]);
+      if (await this.vault.adapter.exists(path)) {
+        console.log(`File "${path}" already exists`);
+        return;
+      }
+      const res = await requestUrl({
+        method: "GET",
+        url: note.source,
+      });
+      this.vault.createBinary(path, res.arrayBuffer);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   getAllNotes = async () => {
 		const noteList: Array<ObsidianNote> = [];
 		try {
