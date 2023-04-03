@@ -112,7 +112,7 @@ export const getDefaultNoteTitle = (
   autoGenerateTitle: boolean,
 ) => {
   if (note.title) {
-    return escapeTitle(note.title);
+    return escapeTitle(note.title) + '.md';
   }
   const titleFromContent = escapeTitle(note.content) ||
     escapeTitle(note.source_title);
