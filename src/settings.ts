@@ -12,18 +12,18 @@ import SupabaseSync from "supabase_sync";
 export interface FleetingNotesSettings {
 	auto_generate_title: boolean;
 	fleeting_notes_folder: string;
-  attachments_folder: string;
+	attachments_folder: string;
 	note_template: string;
 	sync_type: string;
 	notes_filter: string;
 	sync_on_startup: boolean;
 	last_sync_time: Date;
-  sync_obsidian_links: boolean;
-  sync_obsidian_links_title: string;
+	sync_obsidian_links: boolean;
+	sync_obsidian_links_title: string;
 	firebaseId: string | undefined;
 	supabaseId: string | undefined;
-  email: string | undefined;
-  password: string | undefined;
+	email: string | undefined;
+	password: string | undefined;
 	encryption_key: string;
 	sync_interval: NodeJS.Timer | undefined;
 	date_format: string;
@@ -32,9 +32,9 @@ export interface FleetingNotesSettings {
 export const DEFAULT_SETTINGS: FleetingNotesSettings = {
 	auto_generate_title: false,
 	fleeting_notes_folder: "FleetingNotesApp",
-  attachments_folder: "",
+	attachments_folder: "",
 	note_template:
-`---
+		`---
 # Mandatory fields
 id: "\${id}"
 # Optional fields
@@ -51,11 +51,11 @@ modified_date: "\${last_modified_date}"
 	sync_on_startup: false,
 	last_sync_time: new Date(0),
 	sync_type: "one-way",
-  sync_obsidian_links: false,
-  sync_obsidian_links_title: "Links from Obsidian",
+	sync_obsidian_links: false,
+	sync_obsidian_links_title: "Links from Obsidian",
 	notes_filter: "",
-  email: undefined,
-  password: undefined,
+	email: undefined,
+	password: undefined,
 	firebaseId: undefined,
 	supabaseId: undefined,
 	encryption_key: "",
@@ -73,7 +73,7 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 
 	async manageAccount(btn: any) {
 		if (this.plugin.isUserSignedIn()) {
-      this.plugin.signOutUser();
+			this.plugin.signOutUser();
 			btn.setButtonText("Sign In").setCta();
 			return;
 		}
@@ -87,7 +87,7 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 				{
 					label: "Password",
 					value: "password",
-          type: "password",
+					type: "password",
 				},
 			],
 			"Login",
@@ -102,8 +102,8 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 					this.plugin.settings.firebaseId =
 						supaRes.data.user.user_metadata.firebaseUid;
 					this.plugin.settings.supabaseId = supaRes.data.user.id;
-          this.plugin.settings.email = result.email;
-          this.plugin.settings.password = result.password;
+					this.plugin.settings.email = result.email;
+					this.plugin.settings.password = result.password;
 					btn.setButtonText("Sign Out").setCta();
 				} else {
 					new Notice(`Login failed - ${supaRes.error.message}`);
@@ -149,31 +149,31 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 
 		containerEl.createEl("h2", { text: "Sync Settings" });
 
-    new Setting(containerEl)
-      .setName("Notes folder location")
-      .setDesc("Notes will be populated here")
-      .addText((text) =>
-        text
-          .setPlaceholder("Enter the folder location")
-          .setValue(this.plugin.settings.fleeting_notes_folder)
-          .onChange(async (value) => {
-            this.plugin.settings.fleeting_notes_folder = value;
-            await this.plugin.saveSettings();
-          })
-      );
+		new Setting(containerEl)
+			.setName("Notes folder location")
+			.setDesc("Notes will be populated here")
+			.addText((text) =>
+				text
+					.setPlaceholder("Enter the folder location")
+					.setValue(this.plugin.settings.fleeting_notes_folder)
+					.onChange(async (value) => {
+						this.plugin.settings.fleeting_notes_folder = value;
+						await this.plugin.saveSettings();
+					})
+			);
 
-    new Setting(containerEl)
-      .setName("Attachments folder location")
-      .setDesc("Attachments will be populated here")
-      .addText((text) =>
-        text
-          .setPlaceholder("Enter the folder location")
-          .setValue(this.plugin.settings.attachments_folder)
-          .onChange(async (value: string) => {
-            this.plugin.settings.attachments_folder = value;
-            await this.plugin.saveSettings();
-          })
-      );
+		new Setting(containerEl)
+			.setName("Attachments folder location")
+			.setDesc("Attachments will be populated here")
+			.addText((text) =>
+				text
+					.setPlaceholder("Enter the folder location")
+					.setValue(this.plugin.settings.attachments_folder)
+					.onChange(async (value: string) => {
+						this.plugin.settings.attachments_folder = value;
+						await this.plugin.saveSettings();
+					})
+			);
 
 		new Setting(containerEl)
 			.setName("Sync notes automatically")
@@ -193,24 +193,24 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-      .setName("Sync type")
-      .setDesc('Warning: Deleting a note in Obsidian results in its removal from FN with two-way sync')
-      .addDropdown((dropdown) =>
-			dropdown
-				.addOption("one-way", "One-way sync (FN ⇒ Obsidian)")
-				.addOption(
-					"one-way-delete",
-					"One-way sync (FN ⇒ Obsidian) + Delete from FN"
-				)
-				.addOption("realtime-one-way", "Realtime One-way sync (FN ⇒ Obsidian)")
-				.addOption("realtime-two-way", "Realtime Two-way sync (FN ⇔ Obsidian)")
-				.setValue(this.plugin.settings.sync_type)
-				.onChange(async (value) => {
-					this.plugin.settings.sync_type = value;
-          this.plugin.initRealtime(value);
-					await this.plugin.saveSettings();
-				})
-		);
+			.setName("Sync type")
+			.setDesc('Warning: Deleting a note in Obsidian results in its removal from FN with two-way sync')
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("one-way", "One-way sync (FN ⇒ Obsidian)")
+					.addOption(
+						"one-way-delete",
+						"One-way sync (FN ⇒ Obsidian) + Delete from FN"
+					)
+					.addOption("realtime-one-way", "Realtime One-way sync (FN ⇒ Obsidian)")
+					.addOption("realtime-two-way", "Realtime Two-way sync (FN ⇔ Obsidian)")
+					.setValue(this.plugin.settings.sync_type)
+					.onChange(async (value) => {
+						this.plugin.settings.sync_type = value;
+						this.plugin.initRealtime(value);
+						await this.plugin.saveSettings();
+					})
+			);
 
 		containerEl.createEl("h2", { text: "Note Templating Options" });
 
@@ -285,21 +285,21 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Sync Obsidian [[links]] to Fleeting Notes")
-.setDesc(`The note titled "${this.plugin.settings.sync_obsidian_links_title}" will be overwritten in the Fleeting Notes app. If you have a lot of links avoid opening the "Links from Obsidian" in Fleeting Notes as it may crash the app.`)
+			.setDesc(`The note titled "${this.plugin.settings.sync_obsidian_links_title}" will be overwritten in the Fleeting Notes app. If you have a lot of links avoid opening the "Links from Obsidian" in Fleeting Notes as it may crash the app.`)
 			.addToggle((tog) => {
 				tog
 					.setValue(this.plugin.settings.sync_obsidian_links)
 					.onChange(async (val) => {
-            if (val) {
-              const ok = await this.plugin.syncObsidianLinks();
-              if (ok) {
-                this.plugin.settings.sync_obsidian_links = val;
-                await this.plugin.saveSettings();
-              }
-            } else {
-              this.plugin.settings.sync_obsidian_links = val;
-              await this.plugin.saveSettings();
-            }
+						if (val) {
+							const ok = await this.plugin.syncObsidianLinks();
+							if (ok) {
+								this.plugin.settings.sync_obsidian_links = val;
+								await this.plugin.saveSettings();
+							}
+						} else {
+							this.plugin.settings.sync_obsidian_links = val;
+							await this.plugin.saveSettings();
+						}
 					});
 			});
 	}

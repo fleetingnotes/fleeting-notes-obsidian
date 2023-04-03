@@ -10,19 +10,19 @@ const supabase = createClient(
 );
 
 export interface SupabaseNote {
-	id: string;
-	title: string;
-	content: string;
-	source: string;
+  id: string;
+  title: string;
+  content: string;
+  source: string;
   source_title?: string;
   source_description?: string;
   source_image_url?: string;
-	created_at: string;
-	modified_at: string;
-	deleted: boolean;
-	shared: boolean;
-	encrypted: boolean;
-	_partition: string;
+  created_at: string;
+  modified_at: string;
+  deleted: boolean;
+  shared: boolean;
+  encrypted: boolean;
+  _partition: string;
 }
 
 class SupabaseSync {
@@ -32,15 +32,15 @@ class SupabaseSync {
   }
 
   isUpdateNoteSimilar(supaNote: SupabaseNote, updateNote: Note): boolean {
-    let tempSupaNote = {...supaNote} as SupabaseNote;
+    let tempSupaNote = { ...supaNote } as SupabaseNote;
     if (tempSupaNote.encrypted) {
       tempSupaNote = decryptNote(tempSupaNote, this.settings.encryption_key);
     }
     // If updateNote property is empty, then we dont count it as being similar
     return (typeof updateNote.title !== 'string' || updateNote.title === tempSupaNote.title) &&
-    (typeof updateNote.content !== 'string' || updateNote.content === tempSupaNote.content) && 
-    (typeof updateNote.source !== 'string' || updateNote.source === tempSupaNote.source) && 
-    (typeof updateNote.deleted !== 'boolean' || updateNote.deleted === tempSupaNote.deleted)
+      (typeof updateNote.content !== 'string' || updateNote.content === tempSupaNote.content) &&
+      (typeof updateNote.source !== 'string' || updateNote.source === tempSupaNote.source) &&
+      (typeof updateNote.deleted !== 'boolean' || updateNote.deleted === tempSupaNote.deleted)
   }
 
   updateNote = async (note: Note) => {
@@ -57,7 +57,7 @@ class SupabaseSync {
         .select()
         .in("_partition", [this.settings.firebaseId, this.settings.supabaseId])
         .eq("deleted", false)
-      
+
       // header size will be too big otherwise
       if (noteIds.size < 100) {
         query.in("id", [...noteIds])
@@ -73,8 +73,8 @@ class SupabaseSync {
       // and only take notes that are different then what's on cloud
       notes = notes.filter((note) => {
         let supabaseNote = res.data.find(
-          (supabaseNote: SupabaseNote) => 
-          supabaseNote.id === note.id && noteIds.has(supabaseNote.id)
+          (supabaseNote: SupabaseNote) =>
+            supabaseNote.id === note.id && noteIds.has(supabaseNote.id)
         );
         return (supabaseNote) ? !this.isUpdateNoteSimilar(supabaseNote, note) : false;
       });
@@ -162,20 +162,20 @@ class SupabaseSync {
         query.neq("title", this.settings.sync_obsidian_links_title);
       }
       await query.then((res) => {
-          if (res.error) {
-            throwError(res.error, res.error.message);
-          }
-          notes = Array.from(
-            res.data?.map((note: any) => decryptNote(note, this.settings.encryption_key)) || []
+        if (res.error) {
+          throwError(res.error, res.error.message);
+        }
+        notes = Array.from(
+          res.data?.map((note: any) => decryptNote(note, this.settings.encryption_key)) || []
+        );
+        if (this.settings.notes_filter) {
+          notes = notes.filter(
+            (note) =>
+              note.title.includes(this.settings.notes_filter) ||
+              note.content.includes(this.settings.notes_filter)
           );
-          if (this.settings.notes_filter) {
-            notes = notes.filter(
-              (note) =>
-                note.title.includes(this.settings.notes_filter) ||
-                note.content.includes(this.settings.notes_filter)
-            );
-          }
-        });
+        }
+      });
       return notes;
     } catch (e) {
       throwError(
@@ -231,7 +231,7 @@ class SupabaseSync {
           if (note.encrypted) {
             note = decryptNote(note, this.settings.encryption_key);
           }
-          handleNoteChange(note); 
+          handleNoteChange(note);
         }
       })
       .subscribe();

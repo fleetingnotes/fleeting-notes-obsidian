@@ -32,18 +32,18 @@ export interface Note {
 	created_at?: string;
 	modified_at?: string;
 	source?: string;
-  source_title?: string;
-  source_description?: string;
-  source_image_url?: string;
+	source_title?: string;
+	source_description?: string;
+	source_image_url?: string;
 	deleted?: boolean;
-  encrypted?: boolean;
+	encrypted?: boolean;
 }
 
 export default class FleetingNotesPlugin extends Plugin {
 	settings: FleetingNotesSettings;
-  supabaseAuthSubscription: Subscription | undefined;
-  fileSystemSync: FileSystemSync;
-  supabaseSync: SupabaseSync;
+	supabaseAuthSubscription: Subscription | undefined;
+	fileSystemSync: FileSystemSync;
+	supabaseSync: SupabaseSync;
 
 	async onload() {
 		await this.loadSettings();
@@ -53,9 +53,9 @@ export default class FleetingNotesPlugin extends Plugin {
 			name: "Sync Notes with Fleeting Notes",
 			callback: async () => {
 				const isSuccess = await this.syncFleetingNotes();
-        if (isSuccess) {
-          new Notice("Fleeting Notes Sync Success")
-        }
+				if (isSuccess) {
+					new Notice("Fleeting Notes Sync Success")
+				}
 			},
 		});
 
@@ -63,12 +63,12 @@ export default class FleetingNotesPlugin extends Plugin {
 			id: "create-empty-fleeting-note",
 			name: "Create Empty Fleeting Note",
 			callback: async () => {
-        try {
-          await this.createEmptyFleetingNote();
-        } catch (e) {
-          console.error(e);
-          new Notice("Failed to create a Fleeting Note :(")
-        }
+				try {
+					await this.createEmptyFleetingNote();
+				} catch (e) {
+					console.error(e);
+					new Notice("Failed to create a Fleeting Note :(")
+				}
 			},
 		});
 
@@ -95,18 +95,18 @@ export default class FleetingNotesPlugin extends Plugin {
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FleetingNotesSettingsTab(this.app, this));
 
-    // listen for auth state changes
-    const { data } = await SupabaseSync.onAuthStateChange(this.reloginOnSignout);
-    this.supabaseAuthSubscription = data.subscription;
+		// listen for auth state changes
+		const { data } = await SupabaseSync.onAuthStateChange(this.reloginOnSignout);
+		this.supabaseAuthSubscription = data.subscription;
 
-    // init filesystem sync
-    this.fileSystemSync = new FileSystemSync(this.app.vault, this.settings);
+		// init filesystem sync
+		this.fileSystemSync = new FileSystemSync(this.app.vault, this.settings);
 
-    /// init supabase sync
-    this.supabaseSync = new SupabaseSync(this.settings);
+		/// init supabase sync
+		this.supabaseSync = new SupabaseSync(this.settings);
 
-    // intialize realtime
-    this.initRealtime(this.settings.sync_type)
+		// intialize realtime
+		this.initRealtime(this.settings.sync_type)
 
 		// syncs on startup
 		// Files might not be loaded yet
@@ -123,45 +123,45 @@ export default class FleetingNotesPlugin extends Plugin {
 			clearInterval(this.settings.sync_interval);
 		}
 	}
-  
-  initRealtime(sync_type: string) {
-    if (sync_type === 'realtime-two-way') {
-      this.fileSystemSync.onNoteChange(this.supabaseSync.updateNote);
-      this.supabaseSync.onNoteChange((note) => (note.deleted) ? this.fileSystemSync.deleteNotes([note]) : this.fileSystemSync.upsertNotes([note]));
-    } else if (sync_type === 'realtime-one-way') {
-      this.fileSystemSync.offNoteChange();
-      this.supabaseSync.onNoteChange((note) => (note.deleted) ? this.fileSystemSync.deleteNotes([note]) : this.fileSystemSync.upsertNotes([note]));
-    } else {
-      this.fileSystemSync.offNoteChange();
-      this.supabaseSync.removeAllChannels();
-    }
-  }
 
-  async reloginOnSignout(event: string) {
-    if (event == "SIGNED_OUT") {
-      if (this.settings.email && this.settings.password) {
-        try {
-          await SupabaseSync.loginSupabase(this.settings.email, this.settings.password);
-        } catch (e) {
-          this.signOutUser();
-        }
-      } else {
-        this.signOutUser();
-      }
-    }
-  }
+	initRealtime(sync_type: string) {
+		if (sync_type === 'realtime-two-way') {
+			this.fileSystemSync.onNoteChange(this.supabaseSync.updateNote);
+			this.supabaseSync.onNoteChange((note) => (note.deleted) ? this.fileSystemSync.deleteNotes([note]) : this.fileSystemSync.upsertNotes([note]));
+		} else if (sync_type === 'realtime-one-way') {
+			this.fileSystemSync.offNoteChange();
+			this.supabaseSync.onNoteChange((note) => (note.deleted) ? this.fileSystemSync.deleteNotes([note]) : this.fileSystemSync.upsertNotes([note]));
+		} else {
+			this.fileSystemSync.offNoteChange();
+			this.supabaseSync.removeAllChannels();
+		}
+	}
 
-  isUserSignedIn() {
-    return this.settings.firebaseId || this.settings.supabaseId
-  }
+	async reloginOnSignout(event: string) {
+		if (event == "SIGNED_OUT") {
+			if (this.settings.email && this.settings.password) {
+				try {
+					await SupabaseSync.loginSupabase(this.settings.email, this.settings.password);
+				} catch (e) {
+					this.signOutUser();
+				}
+			} else {
+				this.signOutUser();
+			}
+		}
+	}
 
-  signOutUser() {
-    this.settings.supabaseId = undefined;
-    this.settings.email = undefined;
-    this.settings.password = undefined;
-    this.settings.firebaseId = undefined;
-    this.saveSettings();
-  }
+	isUserSignedIn() {
+		return this.settings.firebaseId || this.settings.supabaseId
+	}
+
+	signOutUser() {
+		this.settings.supabaseId = undefined;
+		this.settings.email = undefined;
+		this.settings.password = undefined;
+		this.settings.firebaseId = undefined;
+		this.saveSettings();
+	}
 
 	autoSync(syncIntervalMin: number = 30) {
 		const syncIntervalMs = syncIntervalMin * 60 * 1000;
@@ -175,9 +175,9 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	onunload() {
 		this.disableAutoSync();
-    this.supabaseAuthSubscription?.unsubscribe();
-    this.fileSystemSync.offNoteChange();
-    this.supabaseSync.removeAllChannels();
+		this.supabaseAuthSubscription?.unsubscribe();
+		this.fileSystemSync.offNoteChange();
+		this.supabaseSync.removeAllChannels();
 	}
 
 	async loadSettings() {
@@ -220,10 +220,10 @@ export default class FleetingNotesPlugin extends Plugin {
 
 	// syncs changes between obsidian and fleeting notes
 	async syncFleetingNotes() {
-    if (!this.isUserSignedIn()) {
-      new Notice("No login credentials found")
-      return false;
-    }
+		if (!this.isUserSignedIn()) {
+			new Notice("No login credentials found")
+			return false;
+		}
 		try {
 			if (this.settings.sync_type === "two-way") {
 				await this.pushFleetingNotes();
@@ -231,18 +231,18 @@ export default class FleetingNotesPlugin extends Plugin {
 			// pull fleeting notes
 			let notes = await this.supabaseSync.getAllNotes();
 			notes = notes.filter((note: Note) => !note.deleted);
-      const deleteAfterSync = this.settings.sync_type == "one-way-delete"
-      await this.fileSystemSync.upsertNotes(notes, deleteAfterSync);
+			const deleteAfterSync = this.settings.sync_type == "one-way-delete"
+			await this.fileSystemSync.upsertNotes(notes, deleteAfterSync);
 			if (deleteAfterSync) {
-        await this.deleteFleetingNotes(notes);
+				await this.deleteFleetingNotes(notes);
 			}
 			this.settings.last_sync_time = new Date();
-      // syncs links with Fleeting Notes
-      if (this.settings.sync_obsidian_links) {
-        this.syncObsidianLinks();
-      }
-      
-      return true;
+			// syncs links with Fleeting Notes
+			if (this.settings.sync_obsidian_links) {
+				this.syncObsidianLinks();
+			}
+
+			return true;
 		} catch (e) {
 			if (typeof e === "string") {
 				new Notice(e);
@@ -251,7 +251,7 @@ export default class FleetingNotesPlugin extends Plugin {
 				new Notice("Fleeing Notes sync failed - please check settings");
 			}
 		}
-    return false;
+		return false;
 	}
 
 	async appendStringToActiveFile(content: string) {
@@ -280,22 +280,22 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 	}
 
-  async syncObsidianLinks() {
-    try {
-      let note = await this.supabaseSync.getNoteByTitle(this.settings.sync_obsidian_links_title);
-      if (!note) {
-        note = await this.supabaseSync.createEmptyNote();
-      }
-      const allLinks = this.getAllLinks();
-      const allLinksStr = allLinks.map((link) => `[[${link}]]`).join(" ");
-      note.title = this.settings.sync_obsidian_links_title;
-      note.content = allLinksStr;
-      await this.supabaseSync.updateNote(note);
-      return true;
-    } catch (e) {
-      throwError(e, "Failed to push Obsidian [[links]] to Fleeting Notes")
-    }
-  }
+	async syncObsidianLinks() {
+		try {
+			let note = await this.supabaseSync.getNoteByTitle(this.settings.sync_obsidian_links_title);
+			if (!note) {
+				note = await this.supabaseSync.createEmptyNote();
+			}
+			const allLinks = this.getAllLinks();
+			const allLinksStr = allLinks.map((link) => `[[${link}]]`).join(" ");
+			note.title = this.settings.sync_obsidian_links_title;
+			note.content = allLinksStr;
+			await this.supabaseSync.updateNote(note);
+			return true;
+		} catch (e) {
+			throwError(e, "Failed to push Obsidian [[links]] to Fleeting Notes")
+		}
+	}
 
 	async deleteFleetingNotes(notes: Note[]) {
 		try {
@@ -315,12 +315,12 @@ export default class FleetingNotesPlugin extends Plugin {
 		}
 	}
 
-  async createEmptyFleetingNote() {
-    const note = await this.supabaseSync.createEmptyNote();
-    await this.fileSystemSync.upsertNotes([note]);
-    const obsNote = this.fileSystemSync.existingNoteMap.get(note.id);
-    this.app.workspace.activeLeaf.openFile(obsNote.file);
-  }
+	async createEmptyFleetingNote() {
+		const note = await this.supabaseSync.createEmptyNote();
+		await this.fileSystemSync.upsertNotes([note]);
+		const obsNote = this.fileSystemSync.existingNoteMap.get(note.id);
+		this.app.workspace.activeLeaf.openFile(obsNote.file);
+	}
 
 	// returns a list of files that have been modified since the last sync
 	async getUpdatedLocalNotes() {
