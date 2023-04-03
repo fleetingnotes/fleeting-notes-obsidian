@@ -1,7 +1,20 @@
-import { Note, ObsidianNote } from "main"
-import { TFile, Vault, parseYaml, TAbstractFile, EventRef, requestUrl } from "obsidian"
+import { Note, ObsidianNote } from "main";
+import {
+  EventRef,
+  parseYaml,
+  requestUrl,
+  TAbstractFile,
+  TFile,
+  Vault,
+} from "obsidian";
 import { FleetingNotesSettings } from "settings";
-import { convertObsidianPath, getDefaultNoteTitle, getFilledTemplate, pathJoin, throwError } from "utils";
+import {
+  convertObsidianPath,
+  getDefaultNoteTitle,
+  getFilledTemplate,
+  pathJoin,
+  throwError,
+} from "utils";
 
 class FileSystemSync {
   vault: Vault;
@@ -12,7 +25,7 @@ class FileSystemSync {
   >();
   modifyRef: EventRef;
   deleteRef: EventRef;
-  
+
   constructor(vault: Vault, settings: FleetingNotesSettings) {
     this.vault = vault;
     this.settings = settings;
@@ -20,20 +33,22 @@ class FileSystemSync {
 
   init = async () => {
     await this.getAllNotes().then((notes) => {
-      notes.forEach(n => this.existingNoteMap.set(n.frontmatter.id, n))
-    })
-  }
+      notes.forEach((n) => this.existingNoteMap.set(n.frontmatter.id, n));
+    });
+  };
 
   dirPath = () => convertObsidianPath(this.settings.fleeting_notes_folder);
 
   upsertNotes = async (notes: Array<Note>, addDeleted = false) => {
-		try {
+    try {
       // create folder on init (if doesnt exists)
-      await this.vault.adapter.exists(this.settings.fleeting_notes_folder).then((exists) => {
-        if (!exists) {
-          this.vault.createFolder(this.dirPath());
-        }
-      })
+      await this.vault.adapter.exists(this.settings.fleeting_notes_folder).then(
+        (exists) => {
+          if (!exists) {
+            this.vault.createFolder(this.dirPath());
+          }
+        },
+      );
       if (this.settings.attachments_folder) {
         await this.vault.adapter.exists(this.settings.attachments_folder).then(
           (exists) => {
@@ -45,61 +60,71 @@ class FileSystemSync {
           },
         );
       }
-			for (var i = 0; i < notes.length; i++) {
-				var note = notes[i];
-        const path = this.getNotePath(this.vault, note, this.settings.auto_generate_title);
-				try {
-					var noteFile = this.existingNoteMap.get(note.id) || null;
-					var mdContent = getFilledTemplate(
+      for (var i = 0; i < notes.length; i++) {
+        var note = notes[i];
+        const path = this.getNotePath(
+          this.vault,
+          note,
+          this.settings.auto_generate_title,
+        );
+        try {
+          var noteFile = this.existingNoteMap.get(note.id) || null;
+          var mdContent = getFilledTemplate(
             this.settings.note_template,
-						note,
+            note,
             addDeleted,
             this.settings.date_format,
-					);
-					if (noteFile != null && (await this.vault.adapter.exists(noteFile.file.path))) {
+          );
+          if (
+            noteFile != null &&
+            (await this.vault.adapter.exists(noteFile.file.path))
+          ) {
             // check if file contents are the same
-            var oldMdContent = await this.vault.read(noteFile.file)
+            var oldMdContent = await this.vault.read(noteFile.file);
             if (oldMdContent != mdContent) {
               // modify file if id exists in frontmatter
               await this.vault.modify(noteFile.file, mdContent);
             }
-					} else {
-						// recreate file otherwise
-						var delFile =
-							this.vault.getAbstractFileByPath(path);
-						if (delFile != null) {
-							await this.vault.delete(delFile);
-						}
-						var createdFile = await this.vault.create(path, mdContent);
-            var { frontmatter, content } = await this.parseNoteFile(createdFile);
+          } else {
+            // recreate file otherwise
+            var delFile = this.vault.getAbstractFileByPath(path);
+            if (delFile != null) {
+              await this.vault.delete(delFile);
+            }
+            var createdFile = await this.vault.create(path, mdContent);
+            var { frontmatter, content } = await this.parseNoteFile(
+              createdFile,
+            );
             this.existingNoteMap.set(note.id, {
               file: createdFile,
               frontmatter,
               content,
-            })
-					}
+            });
+          }
           // download source
           this.downloadSource(note, this.settings.attachments_folder);
-				} catch (e) {
-					throwError(
-						e,
-						`Failed to write note "${path}" to Obsidian.\n\n${e.message}`
-					);
-				}
-			}
-		} catch (e) {
-			throwError(e, "Failed to write notes to Obsidian");
-		}
-  }
+        } catch (e) {
+          throwError(
+            e,
+            `Failed to write note "${path}" to Obsidian.\n\n${e.message}`,
+          );
+        }
+      }
+    } catch (e) {
+      throwError(e, "Failed to write notes to Obsidian");
+    }
+  };
 
-  downloadSource = async (note: Note, folder: string) : Promise<void> => {
+  downloadSource = async (note: Note, folder: string): Promise<void> => {
     try {
       const re = /^https:\/\/\w+\.supabase\.co\/storage\/.+$/;
       if (!(re.test(note.source) && this.settings.attachments_folder)) return;
       const ext = note.source.split(".").pop();
-      let filename = note.id
+      let filename = note.id;
       if (note.title) {
-        filename = (note.title.endsWith(`.${ext}`)) ? note.title : `${note.title}.${ext}`;
+        filename = (note.title.endsWith(`.${ext}`))
+          ? note.title
+          : `${note.title}.${ext}`;
       }
       const path = pathJoin([folder, filename]);
       if (await this.vault.adapter.exists(path)) {
@@ -117,54 +142,57 @@ class FileSystemSync {
   };
 
   getAllNotes = async () => {
-		const noteList: Array<ObsidianNote> = [];
-		try {
-			var files = this.vault.getFiles();
-			for (var i = 0; i < files.length; i++) {
-				var file = files[i];
-				if (!this.fileInDir(file)) continue;
-				var file_id: string;
-				var { frontmatter, content } = await this.parseNoteFile(file);
-				file_id = frontmatter.id || null;
-				if (file_id !== null) {
-					noteList.push({ file, frontmatter, content });
-				}
-			}
-		} catch (e) {
-			throwError(e, `Failed to get existing notes from obsidian`);
-		}
+    const noteList: Array<ObsidianNote> = [];
+    try {
+      var files = this.vault.getFiles();
+      for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        if (!this.fileInDir(file)) continue;
+        var file_id: string;
+        var { frontmatter, content } = await this.parseNoteFile(file);
+        file_id = frontmatter.id || null;
+        if (file_id !== null) {
+          noteList.push({ file, frontmatter, content });
+        }
+      }
+    } catch (e) {
+      throwError(e, `Failed to get existing notes from obsidian`);
+    }
     this.existingNoteMap.clear();
-    noteList.forEach(n => this.existingNoteMap.set(n.frontmatter.id, n));
-		return noteList;
-  }
+    noteList.forEach((n) => this.existingNoteMap.set(n.frontmatter.id, n));
+    return noteList;
+  };
   deleteNotes = async (notes: Note[]) => {
-		try {
-			await Promise.all(
-				notes.map((note) => {
+    try {
+      await Promise.all(
+        notes.map((note) => {
           const obsNote = this.existingNoteMap.get(note.id);
           if (obsNote) {
             return this.vault.delete(obsNote.file).then(() => {
-              this.existingNoteMap.delete(note.id)
+              this.existingNoteMap.delete(note.id);
             });
           }
           return null;
-				})
-			);
-		} catch (e) {
-			throwError(e, "Failed to delete notes from Fleeting Notes");
-		}
-  }
+        }),
+      );
+    } catch (e) {
+      throwError(e, "Failed to delete notes from Fleeting Notes");
+    }
+  };
 
-  onNoteChange = (handleNoteChange: (notes: Note) => void, includeDelete = true) => {
+  onNoteChange = (
+    handleNoteChange: (notes: Note) => void,
+    includeDelete = true,
+  ) => {
     this.offNoteChange();
     if (includeDelete) {
       this.deleteRef = this.vault.on("delete", (file) => {
         if (!this.fileInDir(file)) return;
         for (const k of this.existingNoteMap.keys()) {
-          const path = this.existingNoteMap.get(k)?.file.path
+          const path = this.existingNoteMap.get(k)?.file.path;
           const noteId = this.existingNoteMap.get(k)?.frontmatter?.id;
           if (noteId && path === file.path) {
-            return handleNoteChange({id: noteId, deleted: true});
+            return handleNoteChange({ id: noteId, deleted: true });
           }
         }
       });
@@ -175,14 +203,14 @@ class FileSystemSync {
         handleNoteChange(FileSystemSync.parseObsidianNote(n));
       });
     });
-  }
+  };
 
   offNoteChange = () => {
     this.vault.offref(this.deleteRef);
     this.vault.offref(this.modifyRef);
-  }
+  };
 
-  static parseObsidianNote = (note: ObsidianNote) : Note => {
+  static parseObsidianNote = (note: ObsidianNote): Note => {
     var { file, frontmatter, content } = note;
     return {
       id: frontmatter.id,
@@ -192,16 +220,18 @@ class FileSystemSync {
       deleted: frontmatter.deleted || undefined,
       modified_at: new Date(file.stat.mtime).toISOString(),
     };
-  }
+  };
 
   // helpers
-  getNotePath = (vault: Vault, note: Note, autoGenerateTitle: boolean): string => {
-    var noteFileName = note.title
-      ? `${note.title}.md`
-      : getDefaultNoteTitle(
-          note,
-          autoGenerateTitle,
-        );
+  getNotePath = (
+    vault: Vault,
+    note: Note,
+    autoGenerateTitle: boolean,
+  ): string => {
+    var noteFileName = note.title ? `${note.title}.md` : getDefaultNoteTitle(
+      note,
+      autoGenerateTitle,
+    );
     // update existing titles
     var path = convertObsidianPath(pathJoin([this.dirPath(), noteFileName]));
     if (!path.includes(".md")) {
@@ -211,49 +241,48 @@ class FileSystemSync {
     let count = 0;
     while (vault.getAbstractFileByPath(path) != null) {
       count += 1;
-      path = path.replace(/( \([\d]+\))?\.([^/.]+)$/, ` (${count}).$2`); 
+      path = path.replace(/( \([\d]+\))?\.([^/.]+)$/, ` (${count}).$2`);
     }
-    return path
-  }
+    return path;
+  };
   fileInDir = (file: TAbstractFile): boolean => {
     return this.dirPath() === "/"
-    ? !file.path.contains("/")
-    : file.path.startsWith(this.dirPath());
-  }
+      ? !file.path.contains("/")
+      : file.path.startsWith(this.dirPath());
+  };
   convertFileToNote = async (file: TFile): Promise<ObsidianNote> => {
     const { frontmatter, content } = await this.parseNoteFile(file);
     return {
       file,
       frontmatter,
-      content
-    }
-  }
+      content,
+    };
+  };
 
-	parseNoteFile = async (
-		file: TFile
-	): Promise<{ frontmatter: any; content: string }>  => {
-		var frontmatter = {};
-		var rawNoteContent = await this.vault.read(file);
-		var content = rawNoteContent;
-		try {
-			var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
-			if (m) {
-				frontmatter = parseYaml(m[1]);
-				content = content.replace(m[0], "");
-			}
-		} catch (e) {
-			console.error(e, `Failed to parse metadata for: "${file.path}"`);
-		}
-		return { frontmatter, content };
-	}
+  parseNoteFile = async (
+    file: TFile,
+  ): Promise<{ frontmatter: any; content: string }> => {
+    var frontmatter = {};
+    var rawNoteContent = await this.vault.read(file);
+    var content = rawNoteContent;
+    try {
+      var m = rawNoteContent.match(/^---\n([\s\S]*?)\n---\n/m);
+      if (m) {
+        frontmatter = parseYaml(m[1]);
+        content = content.replace(m[0], "");
+      }
+    } catch (e) {
+      console.error(e, `Failed to parse metadata for: "${file.path}"`);
+    }
+    return { frontmatter, content };
+  };
   getFilenamesInFolder(folder: string): Set<string> {
     let existingTitlesInFolder: Set<string> = new Set();
     this.vault.getFiles().forEach((file) => {
-      var fileInDir =
-        folder === "/"
-          ? !file.path.contains("/")
-          : file.path.startsWith(folder);
-      if (fileInDir) existingTitlesInFolder.add(file.name)
+      var fileInDir = folder === "/"
+        ? !file.path.contains("/")
+        : file.path.startsWith(folder);
+      if (fileInDir) existingTitlesInFolder.add(file.name);
     });
     return existingTitlesInFolder;
   }
