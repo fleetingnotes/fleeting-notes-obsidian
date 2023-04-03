@@ -103,7 +103,7 @@ class FileSystemSync {
       }
       const path = pathJoin([folder, filename]);
       if (await this.vault.adapter.exists(path)) {
-        console.log(`File "${path}" already exists gg`);
+        console.log(`File "${path}" already exists`);
         return;
       }
       const res = await requestUrl({
