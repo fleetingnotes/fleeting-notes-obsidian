@@ -100,15 +100,20 @@ export const extractAllTags = (text: string): string[] => {
   }
   return tags;
 };
+
+export const escapeTitle = (t: string | null) =>
+  (t || "")
+    .substring(0, 40)
+    .replace(/[\n\r]/g, " ")
+    .replace(/([\[\]\#\*\:\/\\\^])/g, "");
+
 export const getDefaultNoteTitle = (
   note: Note,
   autoGenerateTitle: boolean,
 ) => {
-  const escapeTitle = (t: string | null) =>
-    (t || "")
-      .substring(0, 40)
-      .replace(/[\n\r]/g, " ")
-      .replace(/([\[\]\#\*\:\/\\\^\.])/g, "");
+  if (note.title) {
+    return escapeTitle(note.title) + '.md';
+  }
   const titleFromContent = escapeTitle(note.content) ||
     escapeTitle(note.source_title);
   if (!autoGenerateTitle || titleFromContent.length === 0) {

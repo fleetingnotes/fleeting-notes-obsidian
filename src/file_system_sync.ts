@@ -14,6 +14,7 @@ import {
   getFilledTemplate,
   pathJoin,
   throwError,
+  escapeTitle,
 } from "utils";
 
 class FileSystemSync {
@@ -120,11 +121,12 @@ class FileSystemSync {
       const re = /^https:\/\/\w+\.supabase\.co\/storage\/.+$/;
       if (!(re.test(note.source) && this.settings.attachments_folder)) return;
       const ext = note.source.split(".").pop();
-      let filename = note.id;
-      if (note.title) {
-        filename = (note.title.endsWith(`.${ext}`))
-          ? note.title
-          : `${note.title}.${ext}`;
+      let filename = `${note.id}.${ext}`;
+      const title = escapeTitle(note.title)
+      if (title) {
+        filename = (title.endsWith(`.${ext}`))
+          ? title
+          : `${title}.${ext}`;
       }
       const path = pathJoin([folder, filename]);
       if (await this.vault.adapter.exists(path)) {
@@ -228,10 +230,7 @@ class FileSystemSync {
     note: Note,
     autoGenerateTitle: boolean,
   ): string => {
-    var noteFileName = note.title ? `${note.title}.md` : getDefaultNoteTitle(
-      note,
-      autoGenerateTitle,
-    );
+    var noteFileName = getDefaultNoteTitle(note, autoGenerateTitle);
     // update existing titles
     var path = convertObsidianPath(pathJoin([this.dirPath(), noteFileName]));
     if (!path.includes(".md")) {
