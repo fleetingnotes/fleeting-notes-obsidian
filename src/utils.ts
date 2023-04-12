@@ -144,8 +144,8 @@ export function getFilledTemplate(
   }
   if (metadataMatch) {
     const escapeForYaml = (text?: string) =>
-      (text || "").replace(/\"/g, '\\"').replace(/\n/, " ").replace(
-        "\\",
+      (text || "").replace(/"/g, '\\"').replace(/\n/g, " ").replace(
+        /\\\\/g,
         "\\\\",
       );
     const escapedTitle = escapeForYaml(note.title);
