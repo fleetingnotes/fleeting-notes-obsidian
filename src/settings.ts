@@ -215,6 +215,13 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.sync_type = value;
             this.plugin.initRealtime(value);
+            if (value.contains('two-way')) {
+              noteTemplateComponent.inputEl.setAttr("disabled", true);
+              this.plugin.settings.note_template = DEFAULT_SETTINGS.note_template;
+              this.display();
+            } else {
+              noteTemplateComponent.inputEl.removeAttribute("disabled");
+            }
             await this.plugin.saveSettings();
           })
       );
@@ -250,7 +257,7 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
         );
         t.inputEl.setAttr("rows", 10);
         t.inputEl.addClass("note_template");
-        if (this.plugin.settings.sync_type == "two-way") {
+        if (this.plugin.settings.sync_type.contains('two-way')) {
           t.inputEl.setAttr("disabled", true);
         }
       })
