@@ -222,7 +222,7 @@ class FileSystemSync {
 
   // helpers
   getNotePath = (note: Note): string => {
-    const noteFileName = getDefaultNoteTitle(note, this.settings.auto_generate_title, this.settings.title_template, this.settings.date_format);
+    const noteFileName = getDefaultNoteTitle(note, this.settings);
     // update existing titles
     let path = convertObsidianPath(pathJoin([this.dirPath(), noteFileName]));
     if (!path.includes(".md")) {
