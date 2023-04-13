@@ -27,10 +27,11 @@ export interface FleetingNotesSettings {
   encryption_key: string;
   sync_interval: NodeJS.Timer | undefined;
   date_format: string;
+  title_template: string;
 }
 
 export const DEFAULT_SETTINGS: FleetingNotesSettings = {
-  auto_generate_title: false,
+  auto_generate_title: true,
   fleeting_notes_folder: "FleetingNotesApp",
   attachments_folder: "",
   note_template: `---
@@ -60,6 +61,7 @@ modified_date: "\${last_modified_date}"
   encryption_key: "",
   sync_interval: undefined,
   date_format: "YYYY-MM-DD",
+  title_template: "${title}",
 };
 export class FleetingNotesSettingsTab extends PluginSettingTab {
   plugin: FleetingNotesPlugin;
@@ -218,6 +220,20 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
       );
 
     containerEl.createEl("h2", { text: "Note Templating Options" });
+    new Setting(containerEl)
+      .setName("Title Template")
+      .setDesc(
+        "By default the ${title} variable populates the title in order of: Note title > Source title > Note ID",
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("Enter title format")
+          .setValue(this.plugin.settings.title_template)
+          .onChange(async (value: string) => {
+            this.plugin.settings.title_template = value;
+            await this.plugin.saveSettings();
+          })
+      );
 
     new Setting(containerEl)
       .setName("Note Template")

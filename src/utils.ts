@@ -3,6 +3,7 @@ var CryptoJS = require("crypto-js");
 import { moment } from "obsidian";
 import { InputModal, ModalInputField, Values } from "./components/inputModal";
 import { SupabaseNote } from "./supabase_sync";
+import { FleetingNotesSettings } from "./settings.ts";
 
 export function openInputModal(
   title: string,
@@ -109,17 +110,20 @@ export const escapeTitle = (t: string | null) =>
 
 export const getDefaultNoteTitle = (
   note: Note,
-  autoGenerateTitle: boolean,
+  settings: FleetingNotesSettings,
 ) => {
-  if (note.title) {
-    return escapeTitle(note.title) + '.md';
+  const noteCopy = { ...note } as Note;
+  const titleFromContent = escapeTitle(noteCopy.content) ||
+    escapeTitle(noteCopy.source_title);
+  if (!noteCopy.title) {
+    if (!settings.auto_generate_title || titleFromContent.length === 0) {
+      noteCopy.title = noteCopy.id;
+    } else {
+      noteCopy.title = titleFromContent;
+    }
   }
-  const titleFromContent = escapeTitle(note.content) ||
-    escapeTitle(note.source_title);
-  if (!autoGenerateTitle || titleFromContent.length === 0) {
-    return `${note.id}.md`;
-  }
-  return `${titleFromContent}.md`;
+  const title = getFilledTemplate(settings.title_template, noteCopy, false, settings.date_format);
+  return `${title}.md`
 };
 
 // paths in obsidian are weird, need function to convert to proper path
