@@ -110,16 +110,21 @@ export const escapeTitle = (t: string | null) =>
 export const getDefaultNoteTitle = (
   note: Note,
   autoGenerateTitle: boolean,
+  title_template = '{{title}}',
+  date_format = 'YYYY-MM-DD',
 ) => {
-  if (note.title) {
-    return escapeTitle(note.title) + '.md';
+  const noteCopy = { ...note } as Note;
+  const titleFromContent = escapeTitle(noteCopy.content) ||
+    escapeTitle(noteCopy.source_title);
+  if (!noteCopy.title) {
+    if (!autoGenerateTitle || titleFromContent.length === 0) {
+      noteCopy.title = noteCopy.id;
+    } else {
+      noteCopy.title = titleFromContent;
+    }
   }
-  const titleFromContent = escapeTitle(note.content) ||
-    escapeTitle(note.source_title);
-  if (!autoGenerateTitle || titleFromContent.length === 0) {
-    return `${note.id}.md`;
-  }
-  return `${titleFromContent}.md`;
+  const title = getFilledTemplate(title_template, noteCopy, false, date_format)
+  return `${title}.md`
 };
 
 // paths in obsidian are weird, need function to convert to proper path

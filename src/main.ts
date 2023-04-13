@@ -89,7 +89,7 @@ export default class FleetingNotesPlugin extends Plugin {
 
     // listen for auth state changes
     const { data } = await SupabaseSync.onAuthStateChange(
-      this.reloginOnSignout,
+      (e: string) => this.reloginOnSignout(e, this.settings),
     );
     this.supabaseAuthSubscription = data.subscription;
 
@@ -139,13 +139,13 @@ export default class FleetingNotesPlugin extends Plugin {
     }
   }
 
-  async reloginOnSignout(event: string) {
+  async reloginOnSignout(event: string, settings: FleetingNotesSettings) {
     if (event == "SIGNED_OUT") {
-      if (this.settings.email && this.settings.password) {
+      if (settings.email && settings.password) {
         try {
           await SupabaseSync.loginSupabase(
-            this.settings.email,
-            this.settings.password,
+            settings.email,
+            settings.password,
           );
         } catch (e) {
           this.signOutUser();
