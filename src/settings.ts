@@ -8,7 +8,7 @@ import {
 import FleetingNotesPlugin from "./main";
 import { openInputModal } from "utils";
 import SupabaseSync from "supabase_sync";
-
+import grayMatter from 'gray-matter';
 export interface FleetingNotesSettings {
   auto_generate_title: boolean;
   fleeting_notes_folder: string;
@@ -249,12 +249,40 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
       .setHeading()
       .addTextArea((t) => {
         noteTemplateComponent = t;
-        t.setValue(this.plugin.settings.note_template).onChange(
-          async (val) => {
+        const errorNoteTemplate = containerEl.createEl("div", {
+          cls: "setting-item-description",
+          text: "",
+        });
+        errorNoteTemplate.style.display = "none";
+  
+        t.setValue(this.plugin.settings.note_template).onChange(async (val) => {
+          let error = "";
+          if (!val) {
+            error = "Note template cannot be empty";
+          }
+
+          const parsedNote = grayMatter(val);
+          if (!parsedNote.data || !parsedNote.content) {
+            error = "Note template wrong format";
+          }
+            
+          if (!parsedNote.data.id) {
+            error =  "Note template 'id' field is required";
+          }
+          
+          if (error)  {
+            errorNoteTemplate.style.display = "block";
+            errorNoteTemplate.style.color = "red";
+            errorNoteTemplate.innerText =error;
+            t.inputEl.style.borderColor = "red";
+          }else {
+            errorNoteTemplate.style.display = "none";
+            t.inputEl.style.borderColor = "";
             this.plugin.settings.note_template = val;
             await this.plugin.saveSettings();
-          },
-        );
+          }
+        });
+  
         t.inputEl.setAttr("rows", 10);
         t.inputEl.addClass("note_template");
         if (this.plugin.settings.sync_type.contains('two-way')) {
