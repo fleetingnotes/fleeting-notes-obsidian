@@ -26,6 +26,7 @@
 	"dependencies": {
 		"@supabase/supabase-js": "^2.0.2",
 		"crypto-js": "^4.1.1",
+		"gray-matter": "^4.0.3",
 		"uuid": "^9.0.0"
 	}
 }
