@@ -8,7 +8,7 @@ import {
 import FleetingNotesPlugin from "./main";
 import { openInputModal } from "utils";
 import SupabaseSync from "supabase_sync";
-
+import grayMatter from "gray-matter";
 export interface FleetingNotesSettings {
   auto_generate_title: boolean;
   fleeting_notes_folder: string;
@@ -69,6 +69,23 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
   constructor(app: App, plugin: FleetingNotesPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  processFrontmatter(val: string) {
+    let error = "";
+    let parsedNote;
+    if (!val) {
+      error = "Note template cannot be empty";
+    }
+    try {
+      parsedNote = grayMatter(val);
+      if (!parsedNote?.data?.id) {
+        error = "Note template 'id' field is required";
+      }
+    } catch (_e) {
+      error = "Note template incorrect format";
+    }
+    return error;
   }
 
   async manageAccount(btn: any) {
@@ -215,9 +232,10 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.sync_type = value;
             this.plugin.initRealtime(value);
-            if (value.contains('two-way')) {
+            if (value.contains("two-way")) {
               noteTemplateComponent.inputEl.setAttr("disabled", true);
-              this.plugin.settings.note_template = DEFAULT_SETTINGS.note_template;
+              this.plugin.settings.note_template =
+                DEFAULT_SETTINGS.note_template;
               this.display();
             } else {
               noteTemplateComponent.inputEl.removeAttribute("disabled");
@@ -249,15 +267,32 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
       .setHeading()
       .addTextArea((t) => {
         noteTemplateComponent = t;
+        const errorNoteTemplate = containerEl.createEl("div", {
+          cls: "setting-item-description",
+          text: "",
+        });
+        errorNoteTemplate.style.display = "none";
+
         t.setValue(this.plugin.settings.note_template).onChange(
-          async (val) => {
-            this.plugin.settings.note_template = val;
-            await this.plugin.saveSettings();
+          async (val: string) => {
+            const error = this.processFrontmatter(val);
+            if (error) {
+              errorNoteTemplate.style.display = "block";
+              errorNoteTemplate.style.color = "red";
+              errorNoteTemplate.innerText = error;
+              t.inputEl.style.borderColor = "red";
+            } else {
+              errorNoteTemplate.style.display = "none";
+              t.inputEl.style.borderColor = "";
+              this.plugin.settings.note_template = val;
+              await this.plugin.saveSettings();
+            }
           },
         );
+
         t.inputEl.setAttr("rows", 10);
         t.inputEl.addClass("note_template");
-        if (this.plugin.settings.sync_type.contains('two-way')) {
+        if (this.plugin.settings.sync_type.contains("two-way")) {
           t.inputEl.setAttr("disabled", true);
         }
       })
