@@ -275,7 +275,7 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
             errorNoteTemplate.style.color = "red";
             errorNoteTemplate.innerText =error;
             t.inputEl.style.borderColor = "red";
-          }else {
+          } else {
             errorNoteTemplate.style.display = "none";
             t.inputEl.style.borderColor = "";
             this.plugin.settings.note_template = val;
