@@ -163,12 +163,11 @@ class FileSystemSync {
   deleteNotes = async (notes: Note[]) => {
     try {
       await Promise.all(
-        notes.map((note) => {
+        notes.map(async (note) => {
           const obsNote = this.existingNoteMap.get(note.id);
           if (obsNote) {
-            return this.vault.delete(obsNote.file).then(() => {
-              this.existingNoteMap.delete(note.id);
-            });
+            await this.vault.delete(obsNote.file);
+            this.existingNoteMap.delete(note.id);
           }
           return null;
         }),
