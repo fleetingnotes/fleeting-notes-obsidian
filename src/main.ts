@@ -30,7 +30,6 @@ export interface Note {
 	_isDeleted: boolean;
 }
 
-
 export default class FleetingNotesPlugin extends Plugin {
 	settings: FleetingNotesSettings;
 
