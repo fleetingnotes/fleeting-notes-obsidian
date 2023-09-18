@@ -123,7 +123,7 @@ export const getDefaultNoteTitle = (
     }
   }
   const title = getFilledTemplate(settings.title_template, noteCopy, false, settings.date_format);
-  return `${title}.md`
+  return `${title.replace(/[\\/]/g, "")}.md`
 };
 
 // paths in obsidian are weird, need function to convert to proper path
@@ -132,6 +132,12 @@ export function convertObsidianPath(path: string) {
   path = path || "/";
   return path;
 }
+
+export const escapeForYaml = (text?: string) =>
+  (text || "").replace(/"/g, '\\"').replace(/\n/g, " ").replace(
+    /\\\\/g,
+    "\\\\",
+  );
 
 // fills the template with the note data
 export function getFilledTemplate(
@@ -147,11 +153,6 @@ export function getFilledTemplate(
     tags = extractAllTags(note.content);
   }
   if (metadataMatch) {
-    const escapeForYaml = (text?: string) =>
-      (text || "").replace(/"/g, '\\"').replace(/\n/g, " ").replace(
-        /\\\\/g,
-        "\\\\",
-      );
     const escapedTitle = escapeForYaml(note.title);
     const escapedContent = escapeForYaml(content);
     const escapedSource = escapeForYaml(note.source);
