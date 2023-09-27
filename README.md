@@ -14,16 +14,6 @@ Full guide on using the plugin: https://fleetingnotes.app/posts/sync-fleeting-no
 1. Now open the [command palette](https://help.obsidian.md/Plugins/Command+palette) and run `Fleeting Notes: Pull All Notes from Fleeting Notes`
 2. Your notes will be synced with Fleeting Notes and you will get a notification!
 
-## Release Steps
-1. Checkout new branch
-```
-git checkout -b version-X.X.X
-```
-2. Run bumpversion script `./bumpversion X.X.X`
-3. Push commit and tags to new branch
-```
-git push
-git push --tags
-```
-4. Add changes to releases in github (https://github.com/fleetingnotes/fleeting-notes-obsidian/releases)
-5. Publish release and merge PR.
+## Want to Contribute
+Checkout contributing documentation here: https://docs.fleetingnotes.app/contributing/obsidian-plugin
+
