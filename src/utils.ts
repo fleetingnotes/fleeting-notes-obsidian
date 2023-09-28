@@ -1,5 +1,5 @@
 import { Note } from "./main";
-var CryptoJS = require("crypto-js");
+import CryptoJS from "crypto-js";
 import { moment } from "obsidian";
 import { InputModal, ModalInputField, Values } from "./components/inputModal";
 import { SupabaseNote } from "./supabase_sync";
@@ -80,15 +80,21 @@ export const encryptNote = (note: Note, key: string) => {
   return note;
 };
 
-export const decryptText = (text: string, key: string) => {
-  var bytes = CryptoJS.AES.decrypt(text, key);
-  var originalText = bytes.toString(CryptoJS.enc.Utf8);
-  return originalText as string;
+export const decryptText = (text: string, key: string): string => {
+  const bytes = CryptoJS.AES.decrypt(text, key);
+  const originalText = bytes.toString(CryptoJS.enc.Utf8);
+  if (!originalText) {
+    throwError(
+      Error("Wrong encryption key"),
+      "Wrong encryption key",
+    );
+  }
+  return originalText;
 };
 
-export const encryptText = (text: string, key: string) => {
-  var ciphertext = CryptoJS.AES.encrypt(text, key).toString();
-  return ciphertext as string;
+export const encryptText = (text: string, key: string): string => {
+  const ciphertext = CryptoJS.AES.encrypt(text, key).toString();
+  return ciphertext;
 };
 
 export const extractAllTags = (text: string): string[] => {
