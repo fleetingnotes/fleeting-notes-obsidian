@@ -1,5 +1,5 @@
 import { Note } from "./main";
-import CryptoJS from "crypto-js";
+var CryptoJS = require("crypto-js");
 import { moment } from "obsidian";
 import { InputModal, ModalInputField, Values } from "./components/inputModal";
 import { SupabaseNote } from "./supabase_sync";
