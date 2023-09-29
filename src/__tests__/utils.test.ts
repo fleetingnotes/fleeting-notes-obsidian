@@ -1,4 +1,4 @@
-import { escapeTitle, getDefaultNoteTitle } from "../utils";
+import { escapeTitle, getDefaultNoteTitle, decryptText, encryptText } from "../utils";
 import { FleetingNotesSettings } from "../settings";
 import { Note } from "../main";
 
@@ -96,5 +96,28 @@ describe('getDefaultNoteTitle', () => {
     const result = getDefaultNoteTitle(note, { ...settings, auto_generate_title: false });
 
     expect(result).toBe('123.md');
+  });
+});
+
+describe('Crypto functions', () => {
+  it('should encrypt and decrypt correctly with the correct key', () => {
+    const originalText = 'My secret message';
+    const key = 'SecretKey';
+    const encryptedText = encryptText(originalText, key);
+    const decryptedText = decryptText(encryptedText, key);
+    expect(decryptedText).toEqual(originalText);
+  });
+
+  it('should throw an error with the wrong decryption key', () => {
+    const originalText = 'My secret message';
+    const correctKey = 'CorrectKey';
+    const wrongKey = 'WrongKey'; 
+    const encryptedText = encryptText(originalText, correctKey);
+
+    try {
+      decryptText(encryptedText, wrongKey);
+    } catch (error) {
+      expect(error).toEqual('Wrong encryption key');
+    }
   });
 });
