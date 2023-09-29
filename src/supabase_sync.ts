@@ -220,6 +220,23 @@ class SupabaseSync {
     }
   };
 
+  static restoreSession = async (): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Error restoring session:", error);
+        return false;
+      }
+      if (data) {
+        await supabase.auth.refreshSession({ refresh_token: data.session.refresh_token })
+        return true
+      }
+    } catch (error) {
+      console.error("Error restoring session:", error);
+    }
+    return false;
+  }
+
   static onAuthStateChange = async (callback: (event: string) => void) => {
     // check user logged in
     supabase.auth.getUser().then((v) => {

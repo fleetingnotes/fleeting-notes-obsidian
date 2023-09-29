@@ -142,6 +142,11 @@ export default class FleetingNotesPlugin extends Plugin {
 
   async reloginOnSignout(event: string, settings: FleetingNotesSettings) {
     if (event == "SIGNED_OUT") {
+      const sessionRestored = await SupabaseSync.restoreSession();
+      if (sessionRestored) {
+        new Notice(`Session restored`);
+        return;
+      }
       if (settings.email && settings.password) {
         try {
           await SupabaseSync.loginSupabase(
