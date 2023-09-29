@@ -112,7 +112,7 @@ export const escapeTitle = (t: string | null) =>
   (t || "")
     .substring(0, 40)
     .replace(/[\n\r]/g, " ")
-    .replace(/([\[\]\#\*\:\/\\\^])/g, "");
+    .replace(/([\[\]\#\*\:\/\\\^\.])/g, "");
 
 export const getDefaultNoteTitle = (
   note: Note,

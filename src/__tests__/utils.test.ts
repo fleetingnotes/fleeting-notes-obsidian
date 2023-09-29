@@ -5,7 +5,7 @@ import { Note } from "../main";
 
 describe('escapeTitle function', () => {
   it('should escape special characters', () => {
-    const input = '#special/characters: ^';
+    const input = '.#special/characters: ^';
     const expected = 'specialcharacters ';
     expect(escapeTitle(input)).toBe(expected);
   });
