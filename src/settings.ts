@@ -88,9 +88,10 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
     return error;
   }
 
-  async manageAccount(btn: any) {
+  async manageAccount(accountSetting: any, btn: any) {
     if (this.plugin.isUserSignedIn()) {
       this.plugin.signOutUser();
+      accountSetting.setDesc("Manage your Fleeting Notes Account");
       btn.setButtonText("Sign In").setCta();
       return;
     }
@@ -108,24 +109,45 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
         },
       ],
       "Login",
-      async (result) => {
-        const supaRes = await SupabaseSync.loginSupabase(
-          result.email,
-          result.password,
-        );
-        const supaSuccess = supaRes === null || supaRes.error ? false : true;
-        if (supaSuccess) {
-          this.plugin.settings.firebaseId =
-            supaRes.data.user.user_metadata.firebaseUid;
-          this.plugin.settings.supabaseId = supaRes.data.user.id;
-          this.plugin.settings.email = result.email;
-          this.plugin.settings.password = result.password;
-          btn.setButtonText("Sign Out").setCta();
-        } else {
-          new Notice(`Login failed - ${supaRes.error.message}`);
-        }
+      async (data) => {
+        const { email, password } = data;
 
-        this.plugin.saveSettings();
+        if (!email || !password) {
+          const errors = [];
+          if (!email) {
+            errors.push('Invalid email');
+          }
+          if (!password) {
+            errors.push('Invalid password');
+          }
+          new Notice('Validation errors: ' + errors.join(', '));
+          return false;
+        }
+        try {
+          const supaRes = await SupabaseSync.loginSupabase(
+            email,
+            password,
+          );
+          const supaSuccess = supaRes === null || supaRes.error ? false : true;
+          if (supaSuccess) {
+            this.plugin.settings.firebaseId =
+              supaRes.data.user.user_metadata.firebaseUid;
+            this.plugin.settings.supabaseId = supaRes.data.user.id;
+            this.plugin.settings.email = email;
+            this.plugin.settings.password = password;
+            accountSetting.setDesc(`You're currently signed in ${this.plugin.settings.email}`);
+            btn.setButtonText("Sign Out").setCta();
+          } else {
+            new Notice(`Login failed - ${supaRes.error.message}`);
+            return false;
+          }
+  
+          this.plugin.saveSettings();
+          return true;
+        } catch (err) {
+          new Notice(`Login failed - ${err}`);
+          return false;
+        }
       },
     );
   }
@@ -138,16 +160,16 @@ export class FleetingNotesSettingsTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "Authentication" });
 
-    new Setting(containerEl)
+    const accountSetting = new Setting(containerEl)
       .setName("Account")
-      .setDesc("Manage your Fleeting Notes Account")
+      .setDesc(this.plugin.settings.supabaseId ? `You're currently signed in ${this.plugin.settings.email}` :"Manage your Fleeting Notes Account")
       .addButton((btn: any) =>
         btn
           .setButtonText(
             this.plugin.settings.supabaseId ? "Sign Out" : "Sign In",
           )
           .setCta()
-          .onClick(async () => await this.manageAccount(btn))
+          .onClick(async () => await this.manageAccount(accountSetting, btn))
       );
 
     new Setting(containerEl)

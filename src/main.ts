@@ -77,8 +77,9 @@ export default class FleetingNotesPlugin extends Plugin {
             },
           ],
           "Search",
-          (result) => {
+          async (result) => {
             this.embedNotesWithText(result.text);
+            return true;
           },
         );
       },

@@ -15,7 +15,7 @@ export class InputModal extends Modal {
   title: string;
   inputs: ModalInputField[];
   submitText: string;
-  onSubmit: (results: Values) => void;
+  onSubmit: (results: Values) => Promise<boolean>;
 
   constructor(
     app: App,
@@ -23,7 +23,7 @@ export class InputModal extends Modal {
       title: string;
       inputs: ModalInputField[];
       submitText: string;
-      onSubmit: (results: Values) => void;
+      onSubmit: (results: Values) => Promise<boolean>;
     },
   ) {
     super(app);
@@ -55,10 +55,10 @@ export class InputModal extends Modal {
       btn
         .setButtonText(this.submitText)
         .setCta()
-        .onClick(() => {
-          this.close();
-          if (Object.keys(this.values).length > 0) {
-            this.onSubmit(this.values);
+        .onClick(async () => {
+          const submitResult = await this.onSubmit(this.values);
+          if (submitResult) {
+            this.close();
           }
         })
     );

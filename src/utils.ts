@@ -9,7 +9,7 @@ export function openInputModal(
   title: string,
   inputs: ModalInputField[],
   submitText: string,
-  onSubmit: (results: Values) => void,
+  onSubmit: (results: Values) => Promise<boolean>,
 ) {
   new InputModal(this.app, { title, inputs, submitText, onSubmit }).open();
 }
