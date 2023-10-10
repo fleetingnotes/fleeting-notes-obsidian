@@ -36,6 +36,7 @@ export default class FleetingNotesPlugin extends Plugin {
   supabaseAuthSubscription: Subscription | undefined;
   fileSystemSync: FileSystemSync;
   supabaseSync: SupabaseSync;
+  tokenRefreshTimer: NodeJS.Timer;
 
   async onload() {
     await this.loadSettings();
@@ -92,6 +93,11 @@ export default class FleetingNotesPlugin extends Plugin {
     const { data } = await SupabaseSync.onAuthStateChange(
       (e: string) => this.reloginOnSignout(e, this.settings),
     );
+    const refreshInterval = 60 * 60 * 1000 * 2; // 1 hour
+    this.tokenRefreshTimer = setInterval(() => {
+      this.checkAndRefreshToken();
+    }, refreshInterval);
+
     this.supabaseAuthSubscription = data.subscription;
 
     // init filesystem sync
@@ -140,8 +146,21 @@ export default class FleetingNotesPlugin extends Plugin {
     }
   }
 
+  async checkAndRefreshToken() {
+    const session = await SupabaseSync.getSession();
+    const threshold = 24 * 60 * 60; // 1 day
+    const currentTime = Math.round(Date.now() / 1000);
+    if (!session || session.expires_at - currentTime < threshold) {
+      this.reloginOnSignout("SIGNED_OUT", this.settings);
+    }
+  }
+
   async reloginOnSignout(event: string, settings: FleetingNotesSettings) {
     if (event == "SIGNED_OUT") {
+      const sessionRestored = await SupabaseSync.restoreSession();
+      if (sessionRestored) {
+        return;
+      }
       if (settings.email && settings.password) {
         try {
           await SupabaseSync.loginSupabase(
@@ -184,6 +203,7 @@ export default class FleetingNotesPlugin extends Plugin {
     this.supabaseAuthSubscription?.unsubscribe();
     this.fileSystemSync.offNoteChange();
     this.supabaseSync.removeAllChannels();
+    clearInterval(this.tokenRefreshTimer);
   }
 
   async loadSettings() {
