@@ -37,6 +37,7 @@ export default class FleetingNotesPlugin extends Plugin {
   fileSystemSync: FileSystemSync;
   supabaseSync: SupabaseSync;
   tokenRefreshTimer: NodeJS.Timer;
+  syncFleetingNotesBusy = false;
 
   async onload() {
     await this.loadSettings();
@@ -246,8 +247,15 @@ export default class FleetingNotesPlugin extends Plugin {
 
   // syncs changes between obsidian and fleeting notes
   async syncFleetingNotes() {
+    if (this.syncFleetingNotesBusy) {
+      return;
+    }
+
+    this.syncFleetingNotesBusy = true;
+
     if (!this.isUserSignedIn()) {
       new Notice("No login credentials found");
+      this.syncFleetingNotesBusy = false;
       return false;
     }
     try {
@@ -267,9 +275,10 @@ export default class FleetingNotesPlugin extends Plugin {
       if (this.settings.sync_obsidian_links) {
         this.syncObsidianLinks();
       }
-
+      this.syncFleetingNotesBusy = false;
       return true;
     } catch (e) {
+      this.syncFleetingNotesBusy = false;
       if (typeof e === "string") {
         new Notice(e);
       } else {
